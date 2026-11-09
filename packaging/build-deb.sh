@@ -45,7 +45,7 @@ for sz in 16 22 24 32 48 64 128 256 512; do
     d="$B/usr/share/icons/hicolor/${sz}x${sz}/apps"; mkdir -p "$d"
     install -m644 "$SRC/icons/${sz}x${sz}/meetinginsights.png" "$d/meetinginsights.png"
 done
-install -m644 "$SRC/meetinginsights.desktop" "$B/usr/share/applications/meetinginsights.desktop"
+install -m644 "$SRC/page.saurabh.MeetingInsights.desktop" "$B/usr/share/applications/page.saurabh.MeetingInsights.desktop"
 install -m644 "$SRC/README.md" "$B/usr/share/doc/meetinginsights/README.md"
 install -m644 "$SRC/LICENSE"  "$B/usr/share/doc/meetinginsights/copyright"
 gzip -9nc "$SRC/packaging/meetinginsights.1" > "$B/usr/share/man/man1/meetinginsights.1.gz"

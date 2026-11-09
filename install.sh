@@ -36,8 +36,10 @@ for sz in 16 22 24 32 48 64 128 256 512; do
 done
 gtk-update-icon-cache -f -t "$PREFIX/share/icons/hicolor" 2>/dev/null || true
 
-sed "s|^Exec=.*|Exec=$PREFIX/bin/meetinginsights-gui|" "$SRC/meetinginsights.desktop" \
-    > "$PREFIX/share/applications/meetinginsights.desktop"
+# The file name must equal the GTK application id, or Wayland shows a generic dock icon.
+rm -f "$PREFIX/share/applications/meetinginsights.desktop"
+sed "s|^Exec=.*|Exec=$PREFIX/bin/meetinginsights-gui|" "$SRC/page.saurabh.MeetingInsights.desktop" \
+    > "$PREFIX/share/applications/page.saurabh.MeetingInsights.desktop"
 update-desktop-database "$PREFIX/share/applications" 2>/dev/null || true
 
 if [[ ! -x "$DATA/venv/bin/python" ]]; then
