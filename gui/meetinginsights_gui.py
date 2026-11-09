@@ -100,6 +100,22 @@ STRINGS = {
         "Could not save the settings": "Não foi possível salvar as configurações",
         "Search meetings…": "Buscar reuniões…",
         "Processor": "Processador",
+        "Voices": "Vozes",
+        "Tell the people on the call apart by their voice": "Separar as pessoas da chamada pela voz",
+        "Splits the other side of the call into Participant 1, 2... Downloads a small model (~46 MB) once.":
+            "Divide o outro lado da chamada em Participante 1, 2... Baixa um modelo pequeno (~46 MB) uma vez.",
+        "Number of speakers: automatic": "Número de pessoas: automático",
+        "Advanced": "Avançado",
+        "Initial prompt": "Prompt inicial",
+        "Names and terms that appear in your meetings": "Nomes e termos que aparecem nas suas reuniões",
+        "Helps the model spell names, products and jargon correctly.":
+            "Ajuda o modelo a escrever corretamente nomes, produtos e jargões.",
+        "Accuracy": "Precisão",
+        "Fast (greedy)": "Rápida (gananciosa)",
+        "Balanced (beam search)": "Equilibrada (beam search)",
+        "Most accurate (slower)": "Mais precisa (mais lenta)",
+        "Even out the volume before transcribing": "Equilibrar o volume antes de transcrever",
+        "Processor threads (0 = automatic)": "Threads do processador (0 = automático)",
         "Live transcript": "Transcrição ao vivo",
         "Transcribing as the meeting runs — the rest is written when you press Stop.":
             "Transcrevendo durante a reunião — o restante é escrito quando você clicar em Parar.",
@@ -1221,16 +1237,43 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
         d.add_button(T("Save"), Gtk.ResponseType.OK)
         d.set_default_response(Gtk.ResponseType.OK)
-        box = d.get_content_area()
-        box.set_spacing(8)
-        box.set_margin_top(16); box.set_margin_bottom(8)
-        box.set_margin_start(20); box.set_margin_end(20)
+        d.set_default_size(520, 640)
+        scroller = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        d.get_content_area().pack_start(scroller, True, True, 0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(16); box.set_margin_bottom(12)
+        box.set_margin_start(22); box.set_margin_end(22)
+        scroller.add(box)
 
         def heading(text):
             lbl = Gtk.Label(xalign=0)
             lbl.set_markup(f"<b>{GLib.markup_escape_text(T(text))}</b>")
+            lbl.set_margin_top(10)
             return lbl
 
+        def note(text):
+            lbl = Gtk.Label(label=T(text), xalign=0, wrap=True)
+            lbl.get_style_context().add_class("dim-label")
+            return lbl
+
+        def switch_row(text, active, tip=None):
+            row = Gtk.Box(spacing=12)
+            lbl = Gtk.Label(label=T(text), xalign=0, wrap=True)
+            lbl.set_hexpand(True)
+            sw = Gtk.Switch(active=active, valign=Gtk.Align.CENTER)
+            row.pack_start(lbl, True, True, 0); row.pack_end(sw, False, False, 0)
+            if tip:
+                row.set_tooltip_text(T(tip))
+            return row, sw
+
+        def combo(options, current, fallback):
+            c = Gtk.ComboBoxText()
+            for key, label in options:
+                c.append(key, T(label))
+            c.set_active_id(current if current in {k for k, _ in options} else fallback)
+            return c
+
+        # ---- speech recognition
         box.pack_start(heading("Transcription model"), False, False, 0)
         model_box = Gtk.ComboBoxText()
         for key, label in self.MODELS:
@@ -1240,19 +1283,55 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             model_box.append(current_model, current_model)
         model_box.set_active_id(current_model)
         box.pack_start(model_box, False, False, 0)
-        hint = Gtk.Label(label=T("Changing it downloads the model once (up to ~1.5 GB)."), xalign=0, wrap=True)
-        hint.get_style_context().add_class("dim-label")
-        box.pack_start(hint, False, False, 0)
+        box.pack_start(note("Changing it downloads the model once (up to ~1.5 GB)."), False, False, 0)
 
-        box.pack_start(heading("Processor"), False, False, 6)
-        dev_box = Gtk.ComboBoxText()
-        dev_box.append("auto", T("Automatic (use the graphics card when there is one)"))
-        dev_box.append("cpu", T("CPU only"))
+        box.pack_start(heading("Processor"), False, False, 0)
         current_device = self._cfg("whisper_device", "auto")
-        dev_box.set_active_id(current_device if current_device in ("auto", "cpu") else "auto")
+        dev_box = combo([("auto", "Automatic (use the graphics card when there is one)"),
+                         ("cpu", "CPU only")], current_device, "auto")
         box.pack_start(dev_box, False, False, 0)
 
-        box.pack_start(heading("Who writes the notes"), False, False, 6)
+        # ---- voices
+        box.pack_start(heading("Voices"), False, False, 0)
+        current_diarize = self._cfg("diarize", "on") == "on"
+        row, diarize_sw = switch_row("Tell the people on the call apart by their voice", current_diarize)
+        box.pack_start(row, False, False, 0)
+        box.pack_start(note("Splits the other side of the call into Participant 1, 2... "
+                            "Downloads a small model (~46 MB) once."), False, False, 0)
+        spk_box = combo([("0", "Number of speakers: automatic")] +
+                        [(str(n), f"{n}") for n in range(2, 9)],
+                        self._cfg("speakers", "0"), "0")
+        box.pack_start(spk_box, False, False, 0)
+
+        # ---- advanced (the options Vibe calls "More options")
+        box.pack_start(heading("Advanced"), False, False, 0)
+        box.pack_start(Gtk.Label(label=T("Initial prompt"), xalign=0), False, False, 0)
+        prompt_entry = Gtk.Entry(text=self._cfg("prompt", ""))
+        prompt_entry.set_placeholder_text(T("Names and terms that appear in your meetings"))
+        box.pack_start(prompt_entry, False, False, 0)
+        box.pack_start(note("Helps the model spell names, products and jargon correctly."), False, False, 0)
+
+        box.pack_start(Gtk.Label(label=T("Accuracy"), xalign=0), False, False, 0)
+        beam_box = combo([("1", "Fast (greedy)"), ("5", "Balanced (beam search)"),
+                          ("8", "Most accurate (slower)")], self._cfg("beam", "5"), "5")
+        box.pack_start(beam_box, False, False, 0)
+
+        row, norm_sw = switch_row("Even out the volume before transcribing",
+                                  self._cfg("normalize", "off") == "on")
+        box.pack_start(row, False, False, 0)
+
+        threads_row = Gtk.Box(spacing=12)
+        threads_row.pack_start(Gtk.Label(label=T("Processor threads (0 = automatic)"), xalign=0), True, True, 0)
+        threads = Gtk.SpinButton.new_with_range(0, 32, 1)
+        try:
+            threads.set_value(int(self._cfg("threads", "0") or 0))
+        except ValueError:
+            pass
+        threads_row.pack_end(threads, False, False, 0)
+        box.pack_start(threads_row, False, False, 0)
+
+        # ---- notes writer
+        box.pack_start(heading("Who writes the notes"), False, False, 0)
         current_provider = self._cfg("notes_provider", "local")
         radios, group = {}, None
         for key, label in self.PROVIDERS:
@@ -1266,9 +1345,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             box.pack_start(rb, False, False, 0)
         if not any(r.get_active() for r in radios.values()):
             radios["local"].set_active(True)
-        warn = Gtk.Label(label=T("The transcript of each meeting will be sent to that service using your own account."),
-                         xalign=0, wrap=True)
-        warn.get_style_context().add_class("dim-label")
+        warn = note("The transcript of each meeting will be sent to that service using your own account.")
         box.pack_start(warn, False, False, 0)
 
         def sync_warn(*_):
@@ -1278,20 +1355,27 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         d.show_all()
         sync_warn()
         resp = d.run()
-        new_model = model_box.get_active_id() or current_model
-        new_provider = next((k for k, rb in radios.items() if rb.get_active()), "local")
-        new_device = dev_box.get_active_id() or current_device
+        new = {
+            "whisper_model": model_box.get_active_id() or current_model,
+            "whisper_device": dev_box.get_active_id() or current_device,
+            "diarize": "on" if diarize_sw.get_active() else "off",
+            "speakers": spk_box.get_active_id() or "0",
+            "prompt": prompt_entry.get_text().strip(),
+            "beam": beam_box.get_active_id() or "5",
+            "normalize": "on" if norm_sw.get_active() else "off",
+            "threads": str(int(threads.get_value())),
+            "notes_provider": next((k for k, rb in radios.items() if rb.get_active()), "local"),
+        }
         d.destroy()
         if resp != Gtk.ResponseType.OK:
             return
-        for key, val in (("whisper_model", new_model), ("notes_provider", new_provider),
-                         ("whisper_device", new_device)):
+        for key, val in new.items():
             r = self.cli("config", key, val)
             if r.returncode != 0:
                 self.error_dialog(T("Could not save the settings"), r.stderr or r.stdout)
                 return
-        if new_model != current_model:
-            self.run_setup()        # downloads the new speech model if it is not cached yet
+        if new["whisper_model"] != current_model or (new["diarize"] == "on" and not current_diarize):
+            self.run_setup()        # downloads the speech / speaker models when they are missing
 
     # ---------- helpers ----------
     def notify(self, summary, body):

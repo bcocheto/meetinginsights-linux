@@ -74,6 +74,19 @@ Open the gear icon in the app (or use `meetinginsights config` / `meetinginsight
 | Spoken language | `system` (follows the OS), `auto`, or a code such as `pt`, `en` | `system` |
 | Transcription model | `small`, `medium`, `large-v3-turbo` | `small` |
 | Who writes the notes | `local`, `claude-code`, `gemini-cli` | `local` |
+| Processor | `auto` (GPU when usable), `cpu` | `auto` |
+| Tell voices apart | `diarize` on/off, `speakers` 0 (auto) to 8 | on |
+| Initial prompt | names and jargon to help spelling (`prompt`) | empty |
+| Accuracy | `beam` 1 (fast) to 10 | 5 |
+| Even out volume / threads | `normalize` on/off, `threads` 0 = auto | off / 0 |
+
+### Telling people apart
+
+Your microphone and the call audio arrive on separate channels, so "You" is exact.
+Everyone on the far end shares one channel; an offline speaker-diarization model
+(sherpa-onnx, ~46 MB, downloaded once) splits it into *Participant 1, 2...* by voice,
+cutting at the moment the voice changes. Files you import (`meetinginsights import`)
+are split the same way into *Speaker 1, 2...*.
 
 `claude-code` and `gemini-cli` use the CLI you already have installed and logged in;
 this app never sees your credentials. They send the transcript to that service, so
