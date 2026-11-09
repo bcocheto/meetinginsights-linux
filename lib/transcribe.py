@@ -20,7 +20,8 @@ LANGUAGE = None if _lang == "auto" else _lang
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from whisper_loader import load_model as _load  # noqa: E402
+from whisper_loader import load_model as _load, options, prepare  # noqa: E402
+from diarize import models_ready as voices_ready, split_words  # noqa: E402
 
 
 def load_model(size, **kw):
@@ -158,7 +159,7 @@ def main() -> int:
         tracks["Speaker"] = audio
 
     print(f"model={model_size} rate={rate}Hz channels={channels}", file=sys.stderr)
-    model = load_model(model_size)
+    model = load_model(model_size, cpu_threads=int(os.environ.get("MEETINGINSIGHTS_THREADS", "0") or 0))
 
     rows = []
     for label, samples in tracks.items():
@@ -166,12 +167,30 @@ def main() -> int:
             print(f"  {label}: silent, skipped", file=sys.stderr)
             continue
         print(f"  transcribing {label} ...", file=sys.stderr)
+        # The far end of a call (or a single-channel file) can hold several people:
+        # tell them apart by voice, splitting even inside one Whisper segment.
+        split = (os.environ.get("MEETINGINSIGHTS_DIARIZE", "on") == "on"
+                 and label in (them, "Speaker") and voices_ready())
         segments, _ = model.transcribe(
-            samples, beam_size=5, vad_filter=True,
-            language=LANGUAGE,
+            prepare(samples), vad_filter=True, word_timestamps=split,
+            language=LANGUAGE, **options(),
             vad_parameters={"threshold": 0.2, "speech_pad_ms": 600,
                             "min_silence_duration_ms": 500},
         )
+        segments = list(segments)
+        runs = None
+        if split:
+            words = [(w.start, w.end, w.word) for seg in segments for w in (seg.words or [])]
+            try:
+                runs = split_words(samples, words, int(os.environ.get("MEETINGINSIGHTS_SPEAKERS", "0") or 0))
+            except Exception as e:  # noqa: BLE001 - never lose the transcript over this
+                print(f"  voice separation skipped: {str(e)[:80]}", file=sys.stderr)
+        if runs:
+            prefix = (os.environ.get("MEETINGINSIGHTS_PREFIX_SPK", "Speaker") if label == "Speaker"
+                      else os.environ.get("MEETINGINSIGHTS_PREFIX_PART", "Participant"))
+            print(f"  {label}: {len({n for _, n, _ in runs})} voices found", file=sys.stderr)
+            rows.extend((st, f"{prefix} {n}", tx) for st, n, tx in runs)
+            continue
         for seg in segments:
             text = seg.text.strip()
             if text:

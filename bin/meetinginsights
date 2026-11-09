@@ -57,6 +57,13 @@ compgen -G "${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}/venv/lib
 WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-$(cfg_get whisper_model "$_default_model")}"
 # Processor for speech recognition: auto (GPU when one is usable) or cpu.
 export MEETINGINSIGHTS_DEVICE="${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_device auto)}"
+# Speech options (see `meetinginsights config`)
+export MEETINGINSIGHTS_DIARIZE="${MEETINGINSIGHTS_DIARIZE:-$(cfg_get diarize on)}"
+export MEETINGINSIGHTS_SPEAKERS="${MEETINGINSIGHTS_SPEAKERS:-$(cfg_get speakers 0)}"
+export MEETINGINSIGHTS_PROMPT="${MEETINGINSIGHTS_PROMPT:-$(cfg_get prompt "")}"
+export MEETINGINSIGHTS_BEAM="${MEETINGINSIGHTS_BEAM:-$(cfg_get beam 5)}"
+export MEETINGINSIGHTS_THREADS="${MEETINGINSIGHTS_THREADS:-$(cfg_get threads 0)}"
+export MEETINGINSIGHTS_NORMALIZE="${MEETINGINSIGHTS_NORMALIZE:-$(cfg_get normalize off)}"
 # Who writes the notes: local (llama.cpp, nothing leaves the machine), claude-code or gemini-cli.
 export MEETINGINSIGHTS_NOTES_PROVIDER="${MEETINGINSIGHTS_NOTES_PROVIDER:-$(cfg_get notes_provider local)}"
 # Spoken language: "system" (follow the OS locale), "auto" (detect), or a code (pt, en, ...).
@@ -148,7 +155,7 @@ cmd_setup() {
         _pct 8
         _step "Installing speech recognition (a few minutes)"
         "$DATA_DIR/venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1
-        "$DATA_DIR/venv/bin/pip" install -q faster-whisper python-docx reportlab >/dev/null 2>&1 \
+        "$DATA_DIR/venv/bin/pip" install -q faster-whisper python-docx reportlab sherpa-onnx >/dev/null 2>&1 \
             || { echo "ERR|could not install faster-whisper"; return 1; }
         # NVIDIA GPU present: add the CUDA libraries (inside this environment only) for faster transcription
         command -v nvidia-smi >/dev/null 2>&1 && \
@@ -156,6 +163,16 @@ cmd_setup() {
         _pct 35
     else
         _step "Python environment ready"; _pct 35
+    fi
+
+    # Telling voices apart on the call (optional: a failure here never blocks setup)
+    if ! "$PY" -c 'import sherpa_onnx' 2>/dev/null; then
+        _step "Installing speaker recognition"
+        "$DATA_DIR/venv/bin/pip" install -q sherpa-onnx >/dev/null 2>&1 || true
+    fi
+    if [[ ! -f "$DATA_DIR/models/diarization/speaker-embedding.onnx" ]]; then
+        _step "Downloading the speaker recognition models (about 46 MB)"
+        "$PY" "$PREFIX/lib/diarize.py" --fetch >/dev/null 2>&1 || true
     fi
 
     if [[ ! -s "$LLM_MODEL" ]]; then
@@ -301,6 +318,23 @@ cmd_status() {
     echo "Recording \"$title\" for $(( ($(date +%s) - started) / 60 ))m ($(basename "$base"))"
 }
 
+
+# Split the far-end channel into one label per voice (Participant 1, 2, ...).
+_split_voices() { # _split_voices <wav> <txt> <target-label> <prefix>
+    [[ "$MEETINGINSIGHTS_DIARIZE" == "on" ]] || return 0
+    [[ -f "$DATA_DIR/models/diarization/speaker-embedding.onnx" ]] || return 0
+    echo "Telling voices apart..."
+    "$PY" "$PREFIX/lib/diarize.py" "$1" "$2" "$3" "$4" "$MEETINGINSIGHTS_SPEAKERS" 2>&1 | grep -E "speakers found|no speaker" || true
+}
+_voice_prefixes() { # sets _p_part and _p_spk according to the interface language
+    case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+        pt*) _p_part=Participante; _p_spk=Falante ;;
+        *)   _p_part=Participant;  _p_spk=Speaker ;;
+    esac
+    export MEETINGINSIGHTS_PREFIX_PART="$_p_part" MEETINGINSIGHTS_PREFIX_SPK="$_p_spk"
+}
+_voice_prefixes
+
 cmd_stop() {
     [[ -f "$STATE" ]] || die "not recording"
     local base title started
@@ -366,6 +400,7 @@ cmd_stop() {
         return 1
     fi
 
+    _voice_prefixes; _split_voices "$base.wav" "$base.txt" "$THEM_LABEL" "$_p_part"
     cmd_notes "$base.txt" "$title" "$mins"
 }
 
@@ -389,25 +424,38 @@ cmd_notes() {
     return 1
 }
 
+CONFIG_KEYS="whisper_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
 cmd_config() {
-    local key="${1:-}" val="${2:-}"
+    local key="${1:-}"; shift || true
+    local val="$*"
     if [[ -z "$key" ]]; then
         echo "whisper_model=$WHISPER_MODEL"
         echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
         echo "whisper_device=$MEETINGINSIGHTS_DEVICE"
+        echo "diarize=$MEETINGINSIGHTS_DIARIZE"
+        echo "speakers=$MEETINGINSIGHTS_SPEAKERS"
+        echo "beam=$MEETINGINSIGHTS_BEAM"
+        echo "threads=$MEETINGINSIGHTS_THREADS"
+        echo "normalize=$MEETINGINSIGHTS_NORMALIZE"
+        echo "prompt=$MEETINGINSIGHTS_PROMPT"
         return 0
     fi
-    [[ "$key" =~ ^(whisper_model|notes_provider|whisper_device)$ ]] || die "unknown setting: $key (whisper_model, notes_provider, whisper_device)"
-    if [[ -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
+    [[ " $CONFIG_KEYS " == *" $key "* ]] || die "unknown setting: $key ($CONFIG_KEYS)"
+    if [[ $# -eq 0 && -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
         notes_provider) [[ "$val" =~ ^(local|claude-code|gemini-cli)$ ]] || die "notes_provider must be local, claude-code or gemini-cli" ;;
         whisper_model)  [[ "$val" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid model name: $val" ;;
         whisper_device) [[ "$val" =~ ^(auto|cpu)$ ]] || die "whisper_device must be auto or cpu" ;;
+        diarize|normalize) [[ "$val" =~ ^(on|off)$ ]] || die "$key must be on or off" ;;
+        speakers)       [[ "$val" =~ ^[0-8]$ ]] || die "speakers must be 0 (automatic) to 8" ;;
+        beam)           [[ "$val" =~ ^([1-9]|10)$ ]] || die "beam must be 1 to 10" ;;
+        threads)        [[ "$val" =~ ^[0-9]{1,2}$ ]] || die "threads must be 0 (automatic) to 99" ;;
+        prompt)         val="$(echo "$val" | tr '\n\r' '  ' | cut -c1-500)" ;;
     esac
     mkdir -p "$(dirname "$CONFIG_FILE")"
     touch "$CONFIG_FILE"
     sed -i "/^$key=/d" "$CONFIG_FILE"
-    echo "$key=$val" >> "$CONFIG_FILE"
+    [[ -n "$val" ]] && echo "$key=$val" >> "$CONFIG_FILE"
     echo "$key=$val"
 }
 
@@ -455,6 +503,7 @@ cmd_reprocess() {
             "$WHISPER_MODEL" "$YOU_LABEL" "$THEM_LABEL" || true
         [[ -s "$base.txt.new" ]] || { rm -f "$base.txt.new"; die "no speech was recognised; the old transcript was kept"; }
         mv -f "$base.txt.new" "$base.txt"
+        _voice_prefixes; _split_voices "$base.wav" "$base.txt" "$THEM_LABEL" "$_p_part"
     fi
     d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
     mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
@@ -510,6 +559,7 @@ cmd_import() {
     local d mins
     d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
     mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
+    _voice_prefixes; _split_voices "$base.wav" "$base.txt" "Speaker" "$_p_spk"
     cmd_notes "$base.txt" "$title" "$mins"
 }
 

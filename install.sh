@@ -46,7 +46,7 @@ if [[ ! -x "$DATA/venv/bin/python" ]]; then
     echo "Creating the Python environment (this takes a minute)..."
     python3 -m venv "$DATA/venv"
     "$DATA/venv/bin/pip" install -q --upgrade pip
-    "$DATA/venv/bin/pip" install -q faster-whisper python-docx reportlab
+    "$DATA/venv/bin/pip" install -q faster-whisper python-docx reportlab sherpa-onnx
     # NVIDIA GPU present: CUDA libraries inside this environment only, for faster transcription
     if command -v nvidia-smi >/dev/null 2>&1; then
         "$DATA/venv/bin/pip" install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 || true

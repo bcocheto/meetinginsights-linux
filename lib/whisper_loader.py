@@ -60,3 +60,27 @@ def load_model(size: str, cpu_threads: int = 0):
     except Exception:  # noqa: BLE001 - not cached: one-time download
         print(f"model {size} is not on disk yet; downloading it once", file=sys.stderr, flush=True)
         return make("cpu", False)
+
+
+def options(live: bool = False) -> dict:
+    """Decoding options from the user's settings (environment variables set by the CLI)."""
+    env = os.environ.get
+    opts = {}
+    prompt = (env("MEETINGINSIGHTS_PROMPT") or "").strip()
+    if prompt:
+        opts["initial_prompt"] = prompt[:500]
+    if not live:
+        try:
+            opts["beam_size"] = max(1, min(10, int(env("MEETINGINSIGHTS_BEAM", "5"))))
+        except ValueError:
+            opts["beam_size"] = 5
+    return opts
+
+
+def prepare(samples):
+    """Optionally even out the volume so quiet voices are not missed."""
+    if os.environ.get("MEETINGINSIGHTS_NORMALIZE", "off") != "on" or not len(samples):
+        return samples
+    import numpy as np
+    peak = float(np.abs(samples).max())
+    return samples if peak < 1e-4 else (samples * (0.9 / peak)).astype(np.float32)

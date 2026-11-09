@@ -31,7 +31,7 @@ LANGUAGE = None if _lang == "auto" else _lang
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from whisper_loader import load_model as _load  # noqa: E402
+from whisper_loader import load_model as _load, options, prepare  # noqa: E402
 
 
 def load_model(size, **kw):
@@ -41,7 +41,7 @@ HEADER = 44                      # canonical PCM wav header parec writes
 RATE = 16000
 WINDOW_S = float(os.environ.get("MEETINGINSIGHTS_LIVE_WINDOW", "45"))
 OVERLAP_S = 1.5
-THREADS = int(os.environ.get("MEETINGINSIGHTS_LIVE_THREADS", "3"))
+THREADS = int(os.environ.get("MEETINGINSIGHTS_THREADS") or os.environ.get("MEETINGINSIGHTS_LIVE_THREADS", "3"))
 MIN_S = 8.0                      # do not bother the model with scraps
 
 
@@ -104,8 +104,8 @@ def main() -> int:
         if samples.size < MIN_S * RATE or float(np.abs(samples).max() or 0) < 0.004:
             return
         segments, _ = model.transcribe(
-            samples, beam_size=1, vad_filter=True,
-            language=LANGUAGE,
+            prepare(samples), beam_size=1, vad_filter=True,
+            language=LANGUAGE, **options(live=True),
             vad_parameters={"threshold": 0.2, "speech_pad_ms": 600,
                             "min_silence_duration_ms": 400})
         for seg in segments:
