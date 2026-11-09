@@ -8,6 +8,7 @@
 #   meetinginsights setup                     fetch the speech and language models
 #   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
 #   meetinginsights config [key [value]]     show or set whisper_model, notes_provider, whisper_device
+#   meetinginsights import <audio|video> [title]   transcribe an existing file and write the notes
 #   meetinginsights reprocess <name> [--notes-only]    transcribe again and rewrite the notes
 #   meetinginsights rename <name> <new title>          rename a meeting
 #   meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
@@ -486,6 +487,32 @@ cmd_rename() {
     echo "Renamed to: $newname"
 }
 
+cmd_import() {
+    local file="${1:-}" title="${2:-}"
+    [[ -f "$file" ]] || die "usage: meetinginsights import <audio-or-video-file> [title]"
+    need ffmpeg; check_ready
+    [[ -n "$title" ]] || title="$(basename "${file%.*}")"
+    local slug ts base
+    slug=$(echo "$title" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+    ts=$(date +%Y-%m-%d_%H-%M)
+    base="$DATA_DIR/rec/${ts}_${slug:-meeting}"
+    mkdir -p "$DATA_DIR/rec" "$OUT_DIR"
+    chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
+    echo "Converting the audio..."
+    ffmpeg -loglevel error -y -i "$file" -vn -ac 1 -ar 16000 "$base.wav" 2>&1 | tail -2
+    [[ -s "$base.wav" ]] || die "could not read audio from: $file"
+    echo "Transcribing on this machine (model: $WHISPER_MODEL)..."
+    "$PY" "$PREFIX/lib/transcribe.py" "$base.wav" "$base.txt" "$WHISPER_MODEL" "$YOU_LABEL" "$THEM_LABEL" || true
+    if [[ ! -s "$base.txt" ]]; then
+        echo "No speech was recognised in this file." >&2
+        rm -f "$base.wav"; return 1
+    fi
+    local d mins
+    d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
+    mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
+    cmd_notes "$base.txt" "$title" "$mins"
+}
+
 cmd_export() {
     local name="${1:-}" fmt="${2:-}" dest="" flag=""
     shift 2 2>/dev/null || true
@@ -523,11 +550,12 @@ case "${1:-}" in
     reprocess) shift; cmd_reprocess "$@" ;;
     rename) shift; cmd_rename "$@" ;;
     export) shift; cmd_export "$@" ;;
+    import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,21p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,22p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac
