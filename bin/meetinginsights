@@ -51,7 +51,7 @@ die()  { echo "meetinginsights: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"; }
 
 default_monitor() {
-    local sink; sink=$(pactl info 2>/dev/null | awk -F': ' '/Default Sink/{print $2}')
+    local sink; sink=$(pactl get-default-sink 2>/dev/null)
     [[ -n "$sink" ]] && echo "${sink}.monitor"
 }
 
@@ -193,7 +193,7 @@ cmd_start() {
     # Resolve the microphone by name rather than passing @DEFAULT_SOURCE@ blind:
     # if the default input is itself a monitor, both captures record the same
     # thing and every turn gets attributed twice under two different names.
-    local src; src=$(pactl info 2>/dev/null | awk -F': ' '/Default Source/{print $2}')
+    local src; src=$(pactl get-default-source 2>/dev/null)
     [[ -n "$src" ]] || die "could not determine the default audio input"
     if [[ "$src" == *.monitor ]]; then
         local real; real=$(pactl list short sources 2>/dev/null | grep -v '\.monitor' | awk 'NR==1{print $2}')
