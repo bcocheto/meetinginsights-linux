@@ -26,13 +26,78 @@ except ValueError:
 gi.require_version("Notify", "0.7")
 from gi.repository import Gdk, GLib, Gtk, Notify, Pango, WebKit2  # noqa: E402
 
+# ---------- interface language (follows the OS locale; English fallback) ----------
+def _ui_lang() -> str:
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        v = os.environ.get(var, "")
+        if v:
+            return v.split(".")[0].split("_")[0].split("@")[0].lower()
+    return "en"
+
+
+UI_LANG = _ui_lang()
+STRINGS = {
+    "pt": {
+        "Language: system default": "Idioma: padrão do sistema",
+        "Language: auto-detect": "Idioma: detectar automaticamente",
+        "Spoken language of the meeting": "Idioma falado na reunião",
+        "Could not save the language": "Não foi possível salvar o idioma",
+        "Set up MeetingInsights": "Configurar o MeetingInsights",
+        "<b>One-time setup</b>": "<b>Configuração inicial</b>",
+        "MeetingInsights needs a speech model and a language model so it can "
+        "transcribe and summarise without sending anything to a server.\n\n"
+        "This downloads about 1.5 GB once. Everything afterwards runs offline.":
+            "O MeetingInsights precisa de um modelo de fala e de um modelo de linguagem para "
+            "transcrever e resumir sem enviar nada a um servidor.\n\n"
+            "Isso baixa cerca de 1,5 GB uma única vez. Depois, tudo roda offline.",
+        "Ready to start": "Pronto para começar",
+        "Not now": "Agora não",
+        "Download and set up": "Baixar e configurar",
+        "Starting…": "Iniciando…",
+        "Done": "Concluído",
+        "Setup complete.": "Configuração concluída.",
+        "Setup did not complete — {detail}": "A configuração não foi concluída — {detail}",
+        "Failed": "Falhou",
+        "Close": "Fechar",
+        "Try again": "Tentar de novo",
+        "records, transcribes and writes notes — entirely on your device":
+            "grava, transcreve e escreve as atas — tudo no seu dispositivo",
+        "Reload meetings": "Recarregar reuniões",
+        "Meeting title  (e.g. SSO standup)": "Título da reunião  (ex.: Reunião de planejamento)",
+        "Idle": "Parado",
+        "IDLE": "PARADO",
+        "Record": "Gravar",
+        "Stop": "Parar",
+        "● RECORDING": "● GRAVANDO",
+        "Working…": "Processando…",
+        "Transcribing…": "Transcrevendo…",
+        "Recording started": "Gravação iniciada",
+        "Could not start recording": "Não foi possível iniciar a gravação",
+        "Notes ready": "Ata pronta",
+        "Meeting notes have been written.": "A ata da reunião foi gerada.",
+        "Recording processed with errors": "Gravação processada com erros",
+        "No meetings yet.\nEnter a title and press Record.":
+            "Nenhuma reunião ainda.\nDigite um título e clique em Gravar.",
+        "Select a meeting to read its notes.": "Selecione uma reunião para ler a ata.",
+        "Could not read notes": "Não foi possível ler a ata",
+        "Transcript": "Transcrição",
+        "Show full transcript": "Mostrar a transcrição completa",
+    },
+}
+
+
+def T(text: str, **kw) -> str:
+    out = STRINGS.get(UI_LANG, {}).get(text, text)
+    return out.format(**kw) if kw else out
+
+
 HOME = Path.home()
 NOTES_DIR = Path(os.environ.get("MEETINGINSIGHTS_OUT", HOME / "MeetingNotes"))
 DATA_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights"))
 LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "meetinginsights" / "language"
 LANGUAGES = [  # (setting stored in the config file, label)
-    ("system", "Language: system default"),
-    ("auto", "Language: auto-detect"),
+    ("system", T("Language: system default")),
+    ("auto", T("Language: auto-detect")),
     ("pt", "Português"), ("en", "English"), ("es", "Español"),
     ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
 ]
@@ -183,7 +248,7 @@ class SetupDialog(Gtk.Dialog):
     """
 
     def __init__(self, parent, cli):
-        super().__init__(title="Set up MeetingInsights", transient_for=parent, modal=True)
+        super().__init__(title=T("Set up MeetingInsights"), transient_for=parent, modal=True)
         self.cli = cli
         self.ok = False
         self.proc = None
@@ -202,19 +267,19 @@ class SetupDialog(Gtk.Dialog):
         box.set_margin_start(22); box.set_margin_end(22)
 
         head = Gtk.Label(xalign=0)
-        head.set_markup("<b>One-time setup</b>")
+        head.set_markup(T("<b>One-time setup</b>"))
         box.pack_start(head, False, False, 0)
 
         blurb = Gtk.Label(xalign=0, wrap=True)
-        blurb.set_text(
+        blurb.set_text(T(
             "MeetingInsights needs a speech model and a language model so it can "
             "transcribe and summarise without sending anything to a server.\n\n"
-            "This downloads about 1.5 GB once. Everything afterwards runs offline.")
+            "This downloads about 1.5 GB once. Everything afterwards runs offline."))
         blurb.get_style_context().add_class("dim-label")
         box.pack_start(blurb, False, False, 0)
 
         self.bar = Gtk.ProgressBar(show_text=True)
-        self.bar.set_text("Ready to start")
+        self.bar.set_text(T("Ready to start"))
         self.bar.set_fraction(0.0)
         box.pack_start(self.bar, False, False, 0)
 
@@ -222,8 +287,8 @@ class SetupDialog(Gtk.Dialog):
         self.status.get_style_context().add_class("micro")
         box.pack_start(self.status, False, False, 0)
 
-        self.cancel_btn = self.add_button("Not now", Gtk.ResponseType.CANCEL)
-        self.start_btn = self.add_button("Download and set up", Gtk.ResponseType.OK)
+        self.cancel_btn = self.add_button(T("Not now"), Gtk.ResponseType.CANCEL)
+        self.start_btn = self.add_button(T("Download and set up"), Gtk.ResponseType.OK)
         self.start_btn.get_style_context().add_class("suggested-action")
         self.connect("response", self.on_response)
         self.show_all()
@@ -233,7 +298,7 @@ class SetupDialog(Gtk.Dialog):
         if resp == Gtk.ResponseType.OK and self.proc is None:
             self.start_btn.set_sensitive(False)
             self.cancel_btn.set_sensitive(False)
-            self.bar.set_text("Starting…")
+            self.bar.set_text(T("Starting…"))
             threading.Thread(target=self._worker, daemon=True).start()
         elif resp == Gtk.ResponseType.CANCEL and self.proc is None:
             self.destroy()
@@ -277,20 +342,20 @@ class SetupDialog(Gtk.Dialog):
         if code == 0:
             self.ok = True
             self.bar.set_fraction(1.0)
-            self.bar.set_text("Done")
-            self.status.set_text("Setup complete.")
+            self.bar.set_text(T("Done"))
+            self.status.set_text(T("Setup complete."))
             GLib.timeout_add(700, lambda: (self.destroy(), False)[1])
         else:
             detail = " ".join(getattr(self, "tail", [])) or f"exit code {code}"
-            self._fail(f"Setup did not complete — {detail}")
+            self._fail(T("Setup did not complete — {detail}", detail=detail))
         return False
 
     def _fail(self, msg):
-        self.bar.set_text("Failed")
+        self.bar.set_text(T("Failed"))
         self.status.set_text(msg)
-        self.cancel_btn.set_label("Close")
+        self.cancel_btn.set_label(T("Close"))
         self.cancel_btn.set_sensitive(True)
-        self.start_btn.set_label("Try again")
+        self.start_btn.set_label(T("Try again"))
         self.start_btn.set_sensitive(True)
         self.proc = None
         return False
@@ -304,10 +369,10 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.started_at = None
 
         hb = Gtk.HeaderBar(show_close_button=True, title="MeetingInsights")
-        hb.set_subtitle("records, transcribes and writes notes — entirely on your device")
+        hb.set_subtitle(T("records, transcribes and writes notes — entirely on your device"))
         self.set_titlebar(hb)
         self.refresh_btn = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
-        self.refresh_btn.set_tooltip_text("Reload meetings")
+        self.refresh_btn.set_tooltip_text(T("Reload meetings"))
         self.refresh_btn.connect("clicked", lambda *_: self.load_meetings())
         hb.pack_end(self.refresh_btn)
 
@@ -341,13 +406,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         box.set_margin_top(14); box.set_margin_bottom(14)
         box.set_margin_start(16); box.set_margin_end(16)
 
-        self.entry = Gtk.Entry(placeholder_text="Meeting title  (e.g. SSO standup)")
+        self.entry = Gtk.Entry(placeholder_text=T("Meeting title  (e.g. SSO standup)"))
         self.entry.set_hexpand(True)
         self.entry.connect("activate", lambda *_: self.on_record())
         box.pack_start(self.entry, True, True, 0)
 
         self.lang_box = Gtk.ComboBoxText()
-        self.lang_box.set_tooltip_text("Spoken language of the meeting")
+        self.lang_box.set_tooltip_text(T("Spoken language of the meeting"))
         for key, label in LANGUAGES:
             self.lang_box.append(key, label)
         self.lang_box.set_active_id(self._saved_language())
@@ -358,11 +423,11 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.timer_lbl.get_style_context().add_class("timer")
         box.pack_start(self.timer_lbl, False, False, 0)
 
-        self.status_lbl = Gtk.Label(label="Idle")
+        self.status_lbl = Gtk.Label(label=T("Idle"))
         self.status_lbl.get_style_context().add_class("micro")
         box.pack_start(self.status_lbl, False, False, 0)
 
-        self.rec_btn = Gtk.Button(label="Record")
+        self.rec_btn = Gtk.Button(label=T("Record"))
         self.rec_btn.get_style_context().add_class("loud")
         self.rec_btn.connect("clicked", lambda *_: self.on_record())
         box.pack_start(self.rec_btn, False, False, 0)
@@ -384,7 +449,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             LANG_FILE.parent.mkdir(parents=True, exist_ok=True)
             LANG_FILE.write_text(key + "\n")
         except OSError as e:
-            self.error_dialog("Could not save the language", str(e))
+            self.error_dialog(T("Could not save the language"), str(e))
 
     # ---------- live transcript ----------
     def current_base(self):
@@ -478,16 +543,16 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.mode = mode
         self.lang_box.set_sensitive(mode == "idle")
         if mode == "recording":
-            self.status_lbl.set_text("● RECORDING"); ctx.add_class("status-rec")
-            self.rec_btn.set_label("Stop"); btn.add_class("quiet")
+            self.status_lbl.set_text(T("● RECORDING")); ctx.add_class("status-rec")
+            self.rec_btn.set_label(T("Stop")); btn.add_class("quiet")
             self.rec_btn.set_sensitive(True); self.entry.set_sensitive(False)
         elif mode == "busy":
-            self.status_lbl.set_text(note or "Working…"); ctx.add_class("status-busy")
-            self.rec_btn.set_label("Working…"); btn.add_class("quiet")
+            self.status_lbl.set_text(note or T("Working…")); ctx.add_class("status-busy")
+            self.rec_btn.set_label(T("Working…")); btn.add_class("quiet")
             self.rec_btn.set_sensitive(False); self.entry.set_sensitive(False)
         else:
-            self.status_lbl.set_text("IDLE")
-            self.rec_btn.set_label("Record"); btn.add_class("loud")
+            self.status_lbl.set_text(T("IDLE"))
+            self.rec_btn.set_label(T("Record")); btn.add_class("loud")
             self.rec_btn.set_sensitive(True); self.entry.set_sensitive(True)
             self.timer_lbl.set_text("00:00"); self.started_at = None
 
@@ -516,7 +581,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
     # ---------- actions ----------
     def on_record(self):
         if self.mode == "recording":
-            self.set_mode("busy", "Transcribing…")
+            self.set_mode("busy", T("Transcribing…"))
             threading.Thread(target=self._stop_worker, daemon=True).start()
         elif self.mode == "idle":
             if not self.is_ready() and not self.run_setup():
@@ -526,9 +591,9 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             if r.returncode == 0:
                 self.started_at = time.time()
                 self.set_mode("recording")
-                self.notify("Recording started", title)
+                self.notify(T("Recording started"), title)
             else:
-                self.error_dialog("Could not start recording", r.stderr or r.stdout)
+                self.error_dialog(T("Could not start recording"), r.stderr or r.stdout)
 
     def _stop_worker(self):
         r = self.cli("stop")
@@ -539,11 +604,11 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self._live_text = None
         self.load_meetings()
         if r.returncode == 0:
-            self.notify("Notes ready", "Meeting notes have been written.")
+            self.notify(T("Notes ready"), T("Meeting notes have been written."))
             if self.listbox.get_row_at_index(0):
                 self.listbox.select_row(self.listbox.get_row_at_index(0))
         else:
-            self.error_dialog("Recording processed with errors", (r.stderr or r.stdout)[-800:])
+            self.error_dialog(T("Recording processed with errors"), (r.stderr or r.stdout)[-800:])
         return False
 
     # ---------- meetings ----------
@@ -553,13 +618,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         files = sorted(NOTES_DIR.glob("*.md"), reverse=True) if NOTES_DIR.exists() else []
         if not files:
             row = Gtk.ListBoxRow(selectable=False)
-            lbl = Gtk.Label(label="No meetings yet.\nEnter a title and press Record.")
+            lbl = Gtk.Label(label=T("No meetings yet.\nEnter a title and press Record."))
             lbl.get_style_context().add_class("empty")
             lbl.set_justify(Gtk.Justification.CENTER)
             lbl.set_margin_top(40)
             row.add(lbl); self.listbox.add(row); self.listbox.show_all()
             self.webview.load_html(f"<style>{NOTE_CSS}</style>"
-                                   "<p style='color:#6b7080'>Select a meeting to read its notes.</p>", None)
+                                   "<p style='color:#6b7080'>" + T("Select a meeting to read its notes.") + "</p>", None)
             return
         for f in files:
             self.listbox.add(self._meeting_row(f))
@@ -595,13 +660,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         try:
             md = row.path.read_text()
         except OSError as e:
-            md = f"# Could not read notes\n\n{e}"
+            md = f"# {T('Could not read notes')}\n\n{e}"
         transcript = REC_DIR / (row.path.stem + ".txt")
         html_doc = md_to_html(md)
         if transcript.exists():
             t = html.escape(transcript.read_text())
-            html_doc += ("<h2>Transcript</h2><details><summary style='cursor:pointer;color:#7aa2ff'>"
-                         "Show full transcript</summary>"
+            html_doc += (f"<h2>{T('Transcript')}</h2><details><summary style='cursor:pointer;color:#7aa2ff'>"
+                         f"{T('Show full transcript')}</summary>"
                          f"<pre style='white-space:pre-wrap;font-size:12.5px;color:#b8bccb'>{t}</pre></details>")
         self.webview.load_html(html_doc, None)
 

@@ -51,8 +51,12 @@ resolve_language() {
 export MEETINGINSIGHTS_LANGUAGE="$(resolve_language)"
 LLM_MODEL="${MEETINGINSIGHTS_LLM_MODEL:-$DATA_DIR/models/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
 LLM_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
-YOU_LABEL="${MEETINGINSIGHTS_YOU:-You}"
-THEM_LABEL="${MEETINGINSIGHTS_THEM:-Participants}"
+case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+    pt*) _you=Você; _them=Participantes ;;
+    *)   _you=You;  _them=Participants ;;
+esac
+YOU_LABEL="${MEETINGINSIGHTS_YOU:-$_you}"
+THEM_LABEL="${MEETINGINSIGHTS_THEM:-$_them}"
 PY="${MEETINGINSIGHTS_PYTHON:-$DATA_DIR/venv/bin/python}"
 LLAMA="${MEETINGINSIGHTS_LLAMA:-}"
 if [[ -z "$LLAMA" ]]; then

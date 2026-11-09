@@ -23,6 +23,33 @@ LLAMA_DIR = Path(os.environ.get(
 LLAMA_BIN = LLAMA_DIR / "llama"
 THREADS = "6"
 
+
+def _ui_lang() -> str:
+    for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        v = os.environ.get(var, "")
+        if v:
+            return v.split(".")[0].split("_")[0].split("@")[0].lower()
+    return "en"
+
+
+_PT = {
+    "Summary": "Resumo", "Action Items": "Itens de ação", "Decisions": "Decisões",
+    "Open Questions": "Perguntas em aberto", "Owner": "Responsável", "Action": "Ação",
+    "Time": "Hora", "said": "disse", "minutes": "minutos", "turns": "falas", "participants": "participantes",
+    "Could not summarize.": "Não foi possível resumir.",
+    "None identified.": "Nenhum identificado.", "None recorded.": "Nenhuma registrada.",
+    "None raised.": "Nenhuma levantada.",
+    "Notes written offline by a small local model. Structure and speaker "
+    "attribution are derived from the transcript itself; only the prose "
+    "summaries are model-generated.":
+        "Ata escrita offline por um modelo local pequeno. A estrutura e a atribuição de falas "
+        "vêm da própria transcrição; só os resumos em texto são gerados pelo modelo.",
+}
+
+
+def T(text: str) -> str:
+    return _PT.get(text, text) if _ui_lang() == "pt" else text
+
 CLASSES = ("action", "decision", "question", "discussion")
 
 
@@ -114,7 +141,7 @@ def classify(turn, prev_speaker=None) -> str:
 def summarize_chunk(model, turns) -> str:
     # single line: the CLI echoes the prompt, and a multi-line echo would be
     # mistaken for the model's reply by the output parser
-    body = "  ".join(f'{t["speaker"]} said: {t["text"]}' for t in turns)
+    body = "  ".join(f'{t["speaker"]} {T("said")}: {t["text"]}' for t in turns)
     sys_p = ("Summarize this part of a meeting in ONE factual sentence. "
              "Use only what is stated. Do not add names or facts that are not present.")
     s = chat(model, sys_p, body, 90).strip()
@@ -155,33 +182,33 @@ def main() -> int:
 
     L = []
     L.append(f"# {title}\n")
-    L.append(f"*{minutes} minutes · {len(turns)} turns · participants: {', '.join(speakers)}*\n")
-    L.append("> Notes written offline by a small local model. Structure and speaker "
+    L.append(f"*{minutes} {T('minutes')} · {len(turns)} {T('turns')} · {T('participants')}: {', '.join(speakers)}*\n")
+    L.append("> " + T("Notes written offline by a small local model. Structure and speaker "
              "attribution are derived from the transcript itself; only the prose "
-             "summaries are model-generated.\n")
+             "summaries are model-generated.") + "\n")
 
-    L.append("## Summary\n")
-    L.extend(f"- {s}" for _, s in summaries) if summaries else L.append("_Could not summarize._")
+    L.append(f"## {T('Summary')}\n")
+    L.extend(f"- {s}" for _, s in summaries) if summaries else L.append(f"_{T('Could not summarize.')}_")
     L.append("")
 
-    L.append("## Action Items\n")
+    L.append(f"## {T('Action Items')}\n")
     if buckets["action"]:
-        L.append("| Owner | Action | Time |")
+        L.append(f"| {T('Owner')} | {T('Action')} | {T('Time')} |")
         L.append("|---|---|---|")
         for t in buckets["action"]:
             L.append(f'| {t["speaker"]} | {t["text"]} | {t["t"]} |')
     else:
-        L.append("_None identified._")
+        L.append(f"_{T('None identified.')}_")
     L.append("")
 
-    L.append("## Decisions\n")
+    L.append(f"## {T('Decisions')}\n")
     L.extend(f'- **{t["speaker"]}** ({t["t"]}): {t["text"]}' for t in buckets["decision"]) \
-        if buckets["decision"] else L.append("_None recorded._")
+        if buckets["decision"] else L.append(f"_{T('None recorded.')}_")
     L.append("")
 
-    L.append("## Open Questions\n")
+    L.append(f"## {T('Open Questions')}\n")
     L.extend(f'- **{t["speaker"]}** ({t["t"]}): {t["text"]}' for t in buckets["question"]) \
-        if buckets["question"] else L.append("_None raised._")
+        if buckets["question"] else L.append(f"_{T('None raised.')}_")
     L.append("")
 
     out_path.write_text("\n".join(L) + "\n")
