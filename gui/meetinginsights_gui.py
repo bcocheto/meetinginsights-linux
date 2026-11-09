@@ -99,6 +99,9 @@ STRINGS = {
         "Save": "Salvar",
         "Could not save the settings": "Não foi possível salvar as configurações",
         "Search meetings…": "Buscar reuniões…",
+        "Processor": "Processador",
+        "Automatic (use the graphics card when there is one)": "Automático (usa a placa de vídeo, se houver)",
+        "CPU only": "Somente CPU",
         "No meetings yet.": "Nenhuma reunião ainda.",
         "Notes by {name}": "Ata por {name}",
         "Written on this computer": "Escrita neste computador",
@@ -1126,6 +1129,14 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         hint.get_style_context().add_class("dim-label")
         box.pack_start(hint, False, False, 0)
 
+        box.pack_start(heading("Processor"), False, False, 6)
+        dev_box = Gtk.ComboBoxText()
+        dev_box.append("auto", T("Automatic (use the graphics card when there is one)"))
+        dev_box.append("cpu", T("CPU only"))
+        current_device = self._cfg("whisper_device", "auto")
+        dev_box.set_active_id(current_device if current_device in ("auto", "cpu") else "auto")
+        box.pack_start(dev_box, False, False, 0)
+
         box.pack_start(heading("Who writes the notes"), False, False, 6)
         current_provider = self._cfg("notes_provider", "local")
         radios, group = {}, None
@@ -1154,10 +1165,12 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         resp = d.run()
         new_model = model_box.get_active_id() or current_model
         new_provider = next((k for k, rb in radios.items() if rb.get_active()), "local")
+        new_device = dev_box.get_active_id() or current_device
         d.destroy()
         if resp != Gtk.ResponseType.OK:
             return
-        for key, val in (("whisper_model", new_model), ("notes_provider", new_provider)):
+        for key, val in (("whisper_model", new_model), ("notes_provider", new_provider),
+                         ("whisper_device", new_device)):
             r = self.cli("config", key, val)
             if r.returncode != 0:
                 self.error_dialog(T("Could not save the settings"), r.stderr or r.stdout)
