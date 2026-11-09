@@ -37,6 +37,8 @@ def parse_notes(md: str) -> list[tuple]:
 
     for raw in md.splitlines():
         s = raw.rstrip()
+        if s.lstrip().startswith("<!--"):
+            continue
         if re.match(r"^\s*\|.*\|\s*$", s):
             if ul:
                 flush()

@@ -227,6 +227,8 @@ def main() -> int:
         if buckets["question"] else L.append(f"_{T('None raised.')}_")
     L.append("")
 
+    if used_external:
+        L.append(f"<!-- mi:provider={used_external} -->")
     out_path.write_text("\n".join(L) + "\n")
     print(f"wrote {out_path}", file=sys.stderr)
     return 0

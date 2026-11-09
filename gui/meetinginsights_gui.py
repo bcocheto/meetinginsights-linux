@@ -60,8 +60,7 @@ STRINGS = {
         "Failed": "Falhou",
         "Close": "Fechar",
         "Try again": "Tentar de novo",
-        "records, transcribes and writes notes — entirely on your device":
-            "grava, transcreve e escreve as atas — tudo no seu dispositivo",
+        "Private meeting notes, on your device": "Atas de reunião privadas, no seu computador",
         "Reload meetings": "Recarregar reuniões",
         "Meeting title  (e.g. SSO standup)": "Título da reunião  (ex.: Reunião de planejamento)",
         "Idle": "Parado",
@@ -100,6 +99,23 @@ STRINGS = {
         "Save": "Salvar",
         "Could not save the settings": "Não foi possível salvar as configurações",
         "Search meetings…": "Buscar reuniões…",
+        "No meetings yet.": "Nenhuma reunião ainda.",
+        "Notes by {name}": "Ata por {name}",
+        "Written on this computer": "Escrita neste computador",
+        "The transcript was sent to that service.": "A transcrição foi enviada a esse serviço.",
+        "Nothing left this computer.": "Nada saiu deste computador.",
+        "Type a title": "Digite um título",
+        "Name the meeting, or leave it blank.": "Dê um nome à reunião, ou deixe em branco.",
+        "Press Record": "Clique em Gravar",
+        "Use headphones so each voice stays on its own channel.":
+            "Use fones de ouvido para cada voz ficar no seu próprio canal.",
+        "Press Stop": "Clique em Parar",
+        "The transcript and the notes appear here, ready to export.":
+            "A transcrição e a ata aparecem aqui, prontas para exportar.",
+        "Welcome to MeetingInsights": "Bem-vindo ao MeetingInsights",
+        "Record a meeting and get a transcript and notes.": "Grave uma reunião e receba a transcrição e a ata.",
+        "Everything runs on this computer unless you choose a cloud service in Settings.":
+            "Tudo roda neste computador, a menos que você escolha um serviço na nuvem em Configurações.",
         "Export": "Exportar",
         "Markdown (.md)": "Markdown (.md)",
         "Word (.docx)": "Word (.docx)",
@@ -233,6 +249,17 @@ list row:selected { background: alpha(%(accent_soft)s, 0.22); border-color: %(ac
 }
 .empty { color: %(text_secondary)s; font-size: 13px; }
 
+.controlbar {
+  background: %(surface)s; border: 1px solid %(hairline)s; border-radius: 18px; padding: 8px 10px;
+}
+.controlbar entry { background: transparent; border-color: transparent; }
+.controlbar entry:focus { background: %(field)s; border-color: %(accent_soft)s; }
+separator { background: %(hairline)s; min-width: 1px; min-height: 1px; margin: 4px 2px; }
+paned > separator { margin: 0; min-width: 1px; background: %(hairline)s; }
+.tag-local, .tag-cloud { font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+.tag-local { color: #57e389; background: alpha(#57e389, 0.14); }
+.tag-cloud { color: #ffa348; background: alpha(#ffa348, 0.16); }
+
 /* action bar: chips, as in Gavetta's filters */
 button.chip {
   padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
@@ -300,6 +327,43 @@ def transcript_html(text: str) -> str:
     return "".join(parts) or f"<pre>{html.escape(text)}</pre>"
 
 
+PROVIDER_NAMES = {"claude-code": "Claude Code", "gemini-cli": "Gemini CLI"}
+
+
+def note_provider(md: str) -> str:
+    """Which external service wrote these notes ('' when the local model did)."""
+    m = re.search(r"<!--\s*mi:provider=([a-z-]+)\s*-->", md)
+    return m.group(1) if m else ""
+
+
+def welcome_html() -> str:
+    steps = [
+        ("1", T("Type a title"), T("Name the meeting, or leave it blank.")),
+        ("2", T("Press Record"), T("Use headphones so each voice stays on its own channel.")),
+        ("3", T("Press Stop"), T("The transcript and the notes appear here, ready to export.")),
+    ]
+    items = "".join(f'<div class="step"><div class="n">{n}</div><div><b>{html.escape(a)}</b>'
+                    f'<div class="d">{html.escape(b)}</div></div></div>' for n, a, b in steps)
+    return (f"<style>{NOTE_CSS}"
+            ".welcome{max-width:520px;margin:46px auto 0;text-align:center}"
+            ".welcome h1{font-size:24px;margin:14px 0 6px}"
+            ".welcome .sub{color:rgba(255,255,255,.55);margin-bottom:26px}"
+            ".step{display:flex;gap:14px;align-items:center;text-align:left;margin:10px 0;padding:12px 16px;"
+            "border-radius:14px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.05)}"
+            ".n{width:30px;height:30px;border-radius:50%;background:rgba(98,160,234,.25);color:#62a0ea;"
+            "display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}"
+            ".d{color:rgba(255,255,255,.55);font-size:13px}"
+            ".priv{margin-top:22px;font-size:12.5px;color:rgba(255,255,255,.45)}"
+            "</style><div class='welcome'>"
+            "<svg width='54' height='54' viewBox='0 0 24 24' fill='none' stroke='#62a0ea' stroke-width='1.6' "
+            "stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='2' width='6' height='12' rx='3'/>"
+            "<path d='M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8'/></svg>"
+            f"<h1>{html.escape(T('Welcome to MeetingInsights'))}</h1>"
+            f"<div class='sub'>{html.escape(T('Record a meeting and get a transcript and notes.'))}</div>"
+            f"{items}<div class='priv'>{html.escape(T('Everything runs on this computer unless you choose a cloud service in Settings.'))}</div>"
+            "</div>")
+
+
 def md_to_html(md: str) -> str:
     """Minimal markdown → HTML. Avoids a hard dependency on the markdown package."""
     try:
@@ -312,6 +376,8 @@ def md_to_html(md: str) -> str:
     out, in_table, in_list = [], False, False
     for line in md.splitlines():
         s = line.rstrip()
+        if s.lstrip().startswith("<!--"):
+            continue
         if re.match(r"^\s*\|.*\|\s*$", s):
             cells = [c.strip() for c in s.strip().strip("|").split("|")]
             if re.match(r"^[\s|:-]+$", s):
@@ -477,7 +543,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.started_at = None
 
         hb = Gtk.HeaderBar(show_close_button=True, title="MeetingInsights")
-        hb.set_subtitle(T("records, transcribes and writes notes — entirely on your device"))
+        hb.set_subtitle(T("Private meeting notes, on your device"))
         self.set_titlebar(hb)
         self.refresh_btn = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
         self.refresh_btn.set_tooltip_text(T("Reload meetings"))
@@ -529,9 +595,12 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         GLib.timeout_add_seconds(1, self.tick)
 
     def _build_controls(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        box.set_margin_top(14); box.set_margin_bottom(14)
-        box.set_margin_start(16); box.set_margin_end(16)
+        wrap = Gtk.Box()
+        wrap.set_margin_top(12); wrap.set_margin_bottom(10)
+        wrap.set_margin_start(12); wrap.set_margin_end(12)
+        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        box.get_style_context().add_class("controlbar")
+        wrap.pack_start(box, True, True, 0)
 
         self.entry = Gtk.Entry(placeholder_text=T("Meeting title  (e.g. SSO standup)"))
         self.entry.set_hexpand(True)
@@ -558,7 +627,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.rec_btn.get_style_context().add_class("loud")
         self.rec_btn.connect("clicked", lambda *_: self.on_record())
         box.pack_start(self.rec_btn, False, False, 0)
-        return box
+        return wrap
 
     @staticmethod
     def _saved_language():
@@ -747,17 +816,31 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         files = sorted(NOTES_DIR.glob("*.md"), reverse=True) if NOTES_DIR.exists() else []
         if not files:
             row = Gtk.ListBoxRow(selectable=False)
-            lbl = Gtk.Label(label=T("No meetings yet.\nEnter a title and press Record."))
+            lbl = Gtk.Label(label=T("No meetings yet."))
             lbl.get_style_context().add_class("empty")
             lbl.set_justify(Gtk.Justification.CENTER)
             lbl.set_margin_top(40)
             row.add(lbl); self.listbox.add(row); self.listbox.show_all()
-            self.webview.load_html(f"<style>{NOTE_CSS}</style>"
-                                   "<p style='color:#6b7080'>" + T("Select a meeting to read its notes.") + "</p>", None)
+            self.webview.load_html(welcome_html(), None)
             return
         for f in files:
             self.listbox.add(self._meeting_row(f))
         self.listbox.show_all()
+
+    def _show_provider(self, provider):
+        ctx = self.provider_lbl.get_style_context()
+        for c in ("tag-local", "tag-cloud"):
+            ctx.remove_class(c)
+        if not provider and self.selected is None:
+            self.provider_lbl.set_text(""); return
+        if provider:
+            ctx.add_class("tag-cloud")
+            self.provider_lbl.set_text("☁  " + T("Notes by {name}", name=PROVIDER_NAMES.get(provider, provider)))
+            self.provider_lbl.set_tooltip_text(T("The transcript was sent to that service."))
+        else:
+            ctx.add_class("tag-local")
+            self.provider_lbl.set_text("●  " + T("Written on this computer"))
+            self.provider_lbl.set_tooltip_text(T("Nothing left this computer."))
 
     def _filter_row(self, row):
         q = self.search.get_text().strip().lower()
@@ -789,6 +872,12 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
                 title = heading[2:].strip()
         except OSError:
             pass
+        try:
+            prov = note_provider(path.read_text(encoding="utf-8"))
+        except OSError:
+            prov = ""
+        if prov:
+            meta += "  ·  ☁ " + PROVIDER_NAMES.get(prov, prov)
         row = Gtk.ListBoxRow()
         row.path = path
         outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -814,6 +903,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         if not row or not hasattr(row, "path"):
             self.selected = None
             self._refresh_actions()
+            self._show_provider("")
             return
         self.selected = row.path
         self._refresh_actions()
@@ -821,6 +911,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             md = row.path.read_text()
         except OSError as e:
             md = f"# {T('Could not read notes')}\n\n{e}"
+        self._show_provider(note_provider(md))
         transcript = REC_DIR / (row.path.stem + ".txt")
         html_doc = md_to_html(md)
         if transcript.exists():
@@ -847,11 +938,14 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             b.get_style_context().add_class("chip")
             if label == "Delete":
                 b.get_style_context().add_class("danger")
-                b.set_halign(Gtk.Align.END); b.set_hexpand(True)
+                bar.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 4)
             b.connect("clicked", lambda _b, h=handler: h())
             b.set_sensitive(False)
             bar.pack_start(b, False, False, 0)
             self.action_btns.append(b)
+        self.provider_lbl = Gtk.Label(label="")
+        self.provider_lbl.set_halign(Gtk.Align.END); self.provider_lbl.set_hexpand(True)
+        bar.pack_start(self.provider_lbl, True, True, 0)
         return bar
 
     def _refresh_actions(self):
@@ -1093,6 +1187,8 @@ class MeetingInsightsApp(Gtk.Application):
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
+        GLib.set_prgname("page.saurabh.MeetingInsights")
+        Gtk.Window.set_default_icon_name("meetinginsights")
         Notify.init("MeetingInsights")
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
