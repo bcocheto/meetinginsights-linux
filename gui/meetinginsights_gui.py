@@ -100,6 +100,17 @@ STRINGS = {
         "Could not save the settings": "Não foi possível salvar as configurações",
         "Search meetings…": "Buscar reuniões…",
         "Processor": "Processador",
+        "Live transcript": "Transcrição ao vivo",
+        "Transcribing as the meeting runs — the rest is written when you press Stop.":
+            "Transcrevendo durante a reunião — o restante é escrito quando você clicar em Parar.",
+        "Listening. The first lines appear after about a minute of speech.":
+            "Ouvindo. As primeiras linhas aparecem depois de cerca de um minuto de fala.",
+        "New meeting": "Nova reunião",
+        "RECENTS": "RECENTES",
+        "Import a file": "Importar arquivo",
+        "Drop an audio or video file here": "Solte um arquivo de áudio ou vídeo aqui",
+        "or click to browse your files": "ou clique para escolher no computador",
+        "More options": "Mais opções",
         "Automatic (use the graphics card when there is one)": "Automático (usa a placa de vídeo, se houver)",
         "CPU only": "Somente CPU",
         "No meetings yet.": "Nenhuma reunião ainda.",
@@ -175,95 +186,101 @@ CLI = os.environ.get("MEETINGINSIGHTS_CLI") or shutil.which("meetinginsights") o
 # Same visual language as Gavetta: neutral dark surface, GNOME blue accent,
 # rounded cards, pill-shaped inputs and chips, hairline borders.
 THEME = {
-    "bg":            "#222226",
-    "bg_bar":        "#1b1b1f",
-    "surface":       "rgba(255,255,255,0.055)",
-    "surface_hover": "rgba(255,255,255,0.13)",
-    "field":         "rgba(255,255,255,0.07)",
+    "bg":            "#1a1a1a",
+    "bg_bar":        "#161616",
+    "surface":       "rgba(255,255,255,0.05)",
+    "surface_hover": "rgba(255,255,255,0.09)",
+    "field":         "rgba(255,255,255,0.06)",
     "hairline":      "rgba(255,255,255,0.08)",
     "accent":        "#3584e4",
     "accent_soft":   "#62a0ea",
-    "text_primary":  "#f2f2f2",
-    "text_secondary":"rgba(255,255,255,0.55)",
+    "text_primary":  "#ececec",
+    "text_secondary":"rgba(255,255,255,0.50)",
     "danger":        "#e01b24",
     "warn":          "#f5c211",
 }
 
 CSS = ("""
 window, .root { background-color: %(bg)s; color: %(text_primary)s; }
-headerbar { background: %(bg_bar)s; border-bottom: 1px solid %(hairline)s; box-shadow: none; color: %(text_primary)s; }
+headerbar { background: %(bg_bar)s; border-bottom: 1px solid %(hairline)s; box-shadow: none; color: %(text_primary)s; min-height: 38px; }
 headerbar button { border-radius: 999px; background: transparent; border: none; box-shadow: none; color: %(text_secondary)s; }
 headerbar button:hover { background: %(surface_hover)s; color: %(text_primary)s; }
-.sidebar { background: transparent; }
 
-.timer {
-  font-family: monospace; font-size: 30px; font-weight: 300;
-  color: %(text_primary)s;
+/* sidebar: flat, like Vibe */
+.sidebar { background: %(bg)s; padding: 14px 8px 4px 8px; }
+.sidebar-title { font-size: 16px; font-weight: 700; padding: 2px 10px 10px 10px; }
+.section-label { font-size: 10px; font-weight: 600; letter-spacing: 1.3px; color: %(text_secondary)s; padding: 16px 10px 6px 10px; }
+button.nav {
+  background: transparent; border: none; box-shadow: none; color: %(text_primary)s;
+  border-radius: 8px; padding: 8px 10px; font-weight: 500;
 }
-.micro {
-  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
-  color: %(text_secondary)s;
-}
+button.nav:hover { background: %(surface_hover)s; }
+separator { background: %(hairline)s; min-width: 1px; min-height: 1px; margin: 0; }
+
+.timer { font-family: monospace; font-size: 26px; font-weight: 300; color: %(text_primary)s; }
+.micro { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: %(text_secondary)s; }
 .status-rec  { color: %(danger)s; }
 .status-busy { color: %(accent_soft)s; }
+.dim-label { color: %(text_secondary)s; font-size: 12px; }
+.dim-icon { color: rgba(255,255,255,0.55); }
+.drop-title { font-size: 16px; font-weight: 600; color: %(text_primary)s; }
 
 entry, searchentry {
   background: %(field)s; color: %(text_primary)s; caret-color: %(accent_soft)s;
-  border: 1px solid %(hairline)s; border-radius: 999px; padding: 8px 16px;
+  border: 1px solid %(hairline)s; border-radius: 999px; padding: 9px 18px;
   font-size: 14px; box-shadow: none;
 }
-entry:focus, searchentry:focus { border-color: %(accent_soft)s; background: rgba(255,255,255,0.10); }
-searchentry { margin: 10px 10px 6px 10px; padding: 6px 12px; }
+entry:focus, searchentry:focus { border-color: %(accent_soft)s; background: rgba(255,255,255,0.09); }
+searchentry { margin: 0 6px 8px 6px; padding: 6px 12px; }
 
 combobox button.combo {
   background: %(field)s; color: %(text_primary)s; border: 1px solid %(hairline)s;
-  border-radius: 999px; padding: 6px 14px; box-shadow: none;
+  border-radius: 999px; padding: 7px 16px; box-shadow: none;
 }
 combobox button.combo:hover { background: %(surface_hover)s; }
 
 button.loud {
   background: %(accent)s; color: #ffffff; border: none; box-shadow: none;
-  border-radius: 999px; padding: 9px 24px; font-weight: 700;
+  border-radius: 999px; padding: 10px 34px; font-weight: 700;
 }
 button.loud:hover { background: %(accent_soft)s; }
 button.quiet {
   background: %(surface)s; color: %(text_primary)s;
   border: 1px solid %(hairline)s; border-radius: 999px; box-shadow: none;
-  padding: 9px 24px; font-weight: 600;
+  padding: 8px 24px; font-weight: 600;
 }
 button.quiet:hover { background: %(surface_hover)s; }
 button.loud:disabled, button.quiet:disabled {
   background: %(surface)s; color: %(text_secondary)s; border: 1px solid %(hairline)s;
 }
 
-/* meeting list: one rounded card per meeting */
+/* recents: flat rows */
 list, list row { background: transparent; }
-list row {
-  margin: 3px 10px; padding: 10px 12px; border-radius: 12px;
-  background: %(surface)s; border: 1px solid rgba(255,255,255,0.05);
-}
-list row:hover { background: %(surface_hover)s; }
-list row:selected { background: alpha(%(accent_soft)s, 0.22); border-color: %(accent_soft)s; }
-.row-title { color: %(text_primary)s; font-weight: 600; }
+list row { margin: 1px 4px; padding: 8px 10px; border-radius: 8px; border: none; }
+list row:hover { background: %(surface)s; }
+list row:selected { background: %(surface_hover)s; }
+.row-title { color: %(text_primary)s; font-weight: 500; }
 .row-meta  { color: %(text_secondary)s; font-size: 11px; }
-.badge {
-  min-width: 32px; min-height: 32px; border-radius: 10px;
-  background: alpha(%(accent_soft)s, 0.25); color: #ffffff;
-}
-.empty { color: %(text_secondary)s; font-size: 13px; }
+.empty { color: %(text_secondary)s; font-size: 12px; }
 
-.controlbar {
-  background: %(surface)s; border: 1px solid %(hairline)s; border-radius: 18px; padding: 8px 10px;
+/* new-meeting page */
+.segment { background: %(surface)s; border: 1px solid %(hairline)s; border-radius: 999px; padding: 3px; }
+.segment button {
+  background: transparent; border: none; box-shadow: none; border-radius: 999px;
+  padding: 7px 20px; color: %(text_secondary)s; font-weight: 600;
 }
-.controlbar entry { background: transparent; border-color: transparent; }
-.controlbar entry:focus { background: %(field)s; border-color: %(accent_soft)s; }
-separator { background: %(hairline)s; min-width: 1px; min-height: 1px; margin: 4px 2px; }
-paned > separator { margin: 0; min-width: 1px; background: %(hairline)s; }
+.segment button:hover { color: %(text_primary)s; }
+.segment button.active { background: rgba(255,255,255,0.10); color: %(text_primary)s; }
+.dropzone {
+  border: 1.5px dashed rgba(255,255,255,0.16); border-radius: 18px; padding: 34px 28px;
+}
+eventbox:hover .dropzone { border-color: %(accent_soft)s; }
+
 .tag-local, .tag-cloud { font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
 .tag-local { color: #57e389; background: alpha(#57e389, 0.14); }
 .tag-cloud { color: #ffa348; background: alpha(#ffa348, 0.16); }
 
-/* action bar: chips, as in Gavetta's filters */
+/* action bar: chips */
 button.chip {
   padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
   background: %(surface)s; color: rgba(255,255,255,0.75);
@@ -278,7 +295,7 @@ dialog, messagedialog { background: %(bg)s; color: %(text_primary)s; }
 
 NOTE_CSS = """
 :root { color-scheme: dark; }
-body { background:#222226; color:#e6e6e8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+body { background:#1a1a1a; color:#e6e6e8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
        font-size: 14px; line-height: 1.65; padding: 24px 28px; margin:0; }
 h1 { font-size: 21px; color:#fff; margin:0 0 4px; }
 h2 { font-size: 13px; letter-spacing: .6px; text-transform: uppercase; color: rgba(255,255,255,.55);
@@ -337,34 +354,6 @@ def note_provider(md: str) -> str:
     """Which external service wrote these notes ('' when the local model did)."""
     m = re.search(r"<!--\s*mi:provider=([a-z-]+)\s*-->", md)
     return m.group(1) if m else ""
-
-
-def welcome_html() -> str:
-    steps = [
-        ("1", T("Type a title"), T("Name the meeting, or leave it blank.")),
-        ("2", T("Press Record"), T("Use headphones so each voice stays on its own channel.")),
-        ("3", T("Press Stop"), T("The transcript and the notes appear here, ready to export.")),
-    ]
-    items = "".join(f'<div class="step"><div class="n">{n}</div><div><b>{html.escape(a)}</b>'
-                    f'<div class="d">{html.escape(b)}</div></div></div>' for n, a, b in steps)
-    return (f"<style>{NOTE_CSS}"
-            ".welcome{max-width:520px;margin:46px auto 0;text-align:center}"
-            ".welcome h1{font-size:24px;margin:14px 0 6px}"
-            ".welcome .sub{color:rgba(255,255,255,.55);margin-bottom:26px}"
-            ".step{display:flex;gap:14px;align-items:center;text-align:left;margin:10px 0;padding:12px 16px;"
-            "border-radius:14px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.05)}"
-            ".n{width:30px;height:30px;border-radius:50%;background:rgba(98,160,234,.25);color:#62a0ea;"
-            "display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}"
-            ".d{color:rgba(255,255,255,.55);font-size:13px}"
-            ".priv{margin-top:22px;font-size:12.5px;color:rgba(255,255,255,.45)}"
-            "</style><div class='welcome'>"
-            "<svg width='54' height='54' viewBox='0 0 24 24' fill='none' stroke='#62a0ea' stroke-width='1.6' "
-            "stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='2' width='6' height='12' rx='3'/>"
-            "<path d='M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8'/></svg>"
-            f"<h1>{html.escape(T('Welcome to MeetingInsights'))}</h1>"
-            f"<div class='sub'>{html.escape(T('Record a meeting and get a transcript and notes.'))}</div>"
-            f"{items}<div class='priv'>{html.escape(T('Everything runs on this computer unless you choose a cloud service in Settings.'))}</div>"
-            "</div>")
 
 
 def md_to_html(md: str) -> str:
@@ -544,93 +533,228 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.set_default_size(1120, 720)
         self.busy = False
         self.started_at = None
+        self.mode = "idle"
+        self.selected = None
 
         hb = Gtk.HeaderBar(show_close_button=True, title="MeetingInsights")
-        hb.set_subtitle(T("Private meeting notes, on your device"))
         self.set_titlebar(hb)
-        self.refresh_btn = Gtk.Button.new_from_icon_name("view-refresh-symbolic", Gtk.IconSize.BUTTON)
-        self.refresh_btn.set_tooltip_text(T("Reload meetings"))
-        self.refresh_btn.connect("clicked", lambda *_: self.load_meetings())
-        hb.pack_end(self.refresh_btn)
-        self.settings_btn = Gtk.Button.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON)
-        self.settings_btn.set_tooltip_text(T("Settings"))
-        self.settings_btn.connect("clicked", lambda *_: self.on_settings())
-        hb.pack_end(self.settings_btn)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         root.get_style_context().add_class("root")
         self.add(root)
-        root.pack_start(self._build_controls(), False, False, 0)
 
-        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        paned.set_position(340)
-        root.pack_start(paned, True, True, 0)
-
-        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
-        sw.get_style_context().add_class("sidebar")
-        self.listbox = Gtk.ListBox()
-        self.listbox.connect("row-selected", self.on_select)
-        sw.add(self.listbox)
+        # ---- sidebar: title, new meeting, recents, settings
         side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         side.get_style_context().add_class("sidebar")
+        side.set_size_request(270, -1)
+        title = Gtk.Label(label="MeetingInsights", xalign=0)
+        title.get_style_context().add_class("sidebar-title")
+        side.pack_start(title, False, False, 0)
+        self.new_btn = Gtk.Button()
+        self.new_btn.get_style_context().add_class("nav")
+        nb = Gtk.Box(spacing=10)
+        nb.pack_start(Gtk.Image.new_from_icon_name("list-add-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        nb.pack_start(Gtk.Label(label=T("New meeting"), xalign=0), False, False, 0)
+        self.new_btn.add(nb)
+        self.new_btn.connect("clicked", lambda *_: self.on_new_meeting())
+        side.pack_start(self.new_btn, False, False, 0)
+        recents = Gtk.Label(label=T("RECENTS"), xalign=0)
+        recents.get_style_context().add_class("section-label")
+        side.pack_start(recents, False, False, 0)
         self.search = Gtk.SearchEntry(placeholder_text=T("Search meetings…"))
         self.search.connect("search-changed", lambda *_: self.listbox.invalidate_filter())
         side.pack_start(self.search, False, False, 0)
-        side.pack_start(sw, True, True, 0)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        self.listbox = Gtk.ListBox()
+        self.listbox.connect("row-selected", self.on_select)
         self.listbox.set_filter_func(self._filter_row)
-        paned.pack1(side, False, False)
+        sw.add(self.listbox)
+        side.pack_start(sw, True, True, 0)
+        self.settings_btn = Gtk.Button()
+        self.settings_btn.get_style_context().add_class("nav")
+        sb = Gtk.Box(spacing=10)
+        sb.pack_start(Gtk.Image.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        sb.pack_start(Gtk.Label(label=T("Settings"), xalign=0), False, False, 0)
+        self.settings_btn.add(sb)
+        self.settings_btn.connect("clicked", lambda *_: self.on_settings())
+        side.pack_start(self.settings_btn, False, False, 6)
+        root.pack_start(side, False, False, 0)
+        root.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 0)
 
+        # ---- stage: "new" (record or import) | "view" (notes, or the live transcript)
+        self.stage = Gtk.Stack()
+        self.stage.add_named(self._build_new_page(), "new")
         self.webview = WebKit2.WebView()
-        self.webview.set_background_color(Gdk.RGBA(0.133, 0.133, 0.149, 1))
-        right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        right.pack_start(self._build_actions(), False, False, 0)
-        right.pack_start(self.webview, True, True, 0)
-        paned.pack2(right, True, False)
-        self.selected = None
+        self.webview.set_background_color(Gdk.RGBA(0.102, 0.102, 0.102, 1))
+        view = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.header = Gtk.Stack()
+        self.header.add_named(self._build_actions(), "actions")
+        self.header.add_named(self._build_recbar(), "rec")
+        view.pack_start(self.header, False, False, 0)
+        view.pack_start(self.webview, True, True, 0)
+        self.stage.add_named(view, "view")
+        root.pack_start(self.stage, True, True, 0)
 
         self.load_meetings()
-        first = self.listbox.get_row_at_index(0)
-        if first is not None and hasattr(first, "path"):
-            self.listbox.select_row(first)
         self.poll_state()
+        self._update_stage()
         GLib.idle_add(lambda: (self.set_focus(None), False)[1])
         GLib.timeout_add(400, self._first_run_check)
         GLib.timeout_add_seconds(1, self.tick)
 
-    def _build_controls(self):
-        wrap = Gtk.Box()
-        wrap.set_margin_top(12); wrap.set_margin_bottom(10)
-        wrap.set_margin_start(12); wrap.set_margin_end(12)
-        box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        box.get_style_context().add_class("controlbar")
-        wrap.pack_start(box, True, True, 0)
+    # ---------- the "new meeting" page: record or import ----------
+    def _build_new_page(self):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        col.set_size_request(520, -1)
+        col.set_halign(Gtk.Align.CENTER); col.set_valign(Gtk.Align.CENTER)
+        outer.pack_start(col, True, False, 0)
 
+        seg = Gtk.Box(spacing=2)
+        seg.get_style_context().add_class("segment")
+        seg.set_halign(Gtk.Align.CENTER)
+        self.seg_btns = {}
+        for key, icon, label in (("record", "audio-input-microphone-symbolic", "Record"),
+                                 ("import", "document-open-symbolic", "Import a file")):
+            b = Gtk.Button()
+            row = Gtk.Box(spacing=8)
+            row.pack_start(Gtk.Image.new_from_icon_name(icon, Gtk.IconSize.MENU), False, False, 0)
+            row.pack_start(Gtk.Label(label=T(label)), False, False, 0)
+            b.add(row)
+            b.connect("clicked", lambda _b, k=key: self._set_new_mode(k))
+            seg.pack_start(b, False, False, 0)
+            self.seg_btns[key] = b
+        col.pack_start(seg, False, False, 0)
+
+        self.new_stack = Gtk.Stack()
+        # record card
+        rec = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        rec.get_style_context().add_class("dropzone")
+        mic = Gtk.Image.new_from_icon_name("audio-input-microphone-symbolic", Gtk.IconSize.DIALOG)
+        mic.set_pixel_size(40); mic.get_style_context().add_class("dim-icon")
+        rec.pack_start(mic, False, False, 0)
         self.entry = Gtk.Entry(placeholder_text=T("Meeting title  (e.g. SSO standup)"))
-        self.entry.set_hexpand(True)
         self.entry.connect("activate", lambda *_: self.on_record())
-        box.pack_start(self.entry, True, True, 0)
+        rec.pack_start(self.entry, False, False, 0)
+        self.rec_btn = Gtk.Button(label=T("Record"))
+        self.rec_btn.get_style_context().add_class("loud")
+        self.rec_btn.set_halign(Gtk.Align.CENTER)
+        self.rec_btn.connect("clicked", lambda *_: self.on_record())
+        rec.pack_start(self.rec_btn, False, False, 0)
+        hint = Gtk.Label(label=T("Use headphones so each voice stays on its own channel."))
+        hint.get_style_context().add_class("dim-label")
+        rec.pack_start(hint, False, False, 0)
+        self.new_stack.add_named(rec, "record")
+        # import card (click or drop a file)
+        imp = Gtk.EventBox()
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.get_style_context().add_class("dropzone")
+        card.set_size_request(-1, 268); card.set_valign(Gtk.Align.CENTER)
+        up = Gtk.Image.new_from_icon_name("folder-open-symbolic", Gtk.IconSize.DIALOG)
+        up.set_pixel_size(40); up.get_style_context().add_class("dim-icon")
+        card.pack_start(up, False, False, 0)
+        big = Gtk.Label(label=T("Drop an audio or video file here"))
+        big.get_style_context().add_class("drop-title")
+        card.pack_start(big, False, False, 0)
+        small = Gtk.Label(label=T("or click to browse your files"))
+        small.get_style_context().add_class("dim-label")
+        card.pack_start(small, False, False, 0)
+        imp.add(card)
+        imp.connect("button-press-event", lambda *_: self.on_import_pick())
+        imp.drag_dest_set(Gtk.DestDefaults.ALL, [Gtk.TargetEntry.new("text/uri-list", 0, 0)], Gdk.DragAction.COPY)
+        imp.connect("drag-data-received", self._on_drop)
+        self.new_stack.add_named(imp, "import")
+        col.pack_start(self.new_stack, False, False, 0)
 
+        opts = Gtk.Box(spacing=12)
+        opts.set_halign(Gtk.Align.CENTER)
         self.lang_box = Gtk.ComboBoxText()
         self.lang_box.set_tooltip_text(T("Spoken language of the meeting"))
         for key, label in LANGUAGES:
             self.lang_box.append(key, label)
         self.lang_box.set_active_id(self._saved_language())
         self.lang_box.connect("changed", self.on_language_changed)
-        box.pack_start(self.lang_box, False, False, 0)
+        opts.pack_start(self.lang_box, False, False, 0)
+        more = Gtk.Button(label=T("More options"))
+        more.get_style_context().add_class("nav")
+        more.connect("clicked", lambda *_: self.on_settings())
+        opts.pack_start(more, False, False, 0)
+        col.pack_start(opts, False, False, 0)
+        self._set_new_mode("record")
+        return outer
 
-        self.timer_lbl = Gtk.Label(label="00:00")
-        self.timer_lbl.get_style_context().add_class("timer")
-        box.pack_start(self.timer_lbl, False, False, 0)
+    def _set_new_mode(self, key):
+        self.new_stack.set_visible_child_name(key)
+        for k, b in self.seg_btns.items():
+            ctx = b.get_style_context()
+            (ctx.add_class if k == key else ctx.remove_class)("active")
 
+    def _on_drop(self, _w, _ctx, _x, _y, data, _info, _time):
+        uris = data.get_uris() or []
+        if uris:
+            try:
+                self.import_file(GLib.filename_from_uri(uris[0])[0])
+            except (GLib.Error, TypeError):
+                pass
+
+    def on_import_pick(self):
+        d = Gtk.FileChooserDialog(title=T("Import a file"), transient_for=self,
+                                  action=Gtk.FileChooserAction.OPEN)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Import a file"), Gtk.ResponseType.OK)
+        flt = Gtk.FileFilter(); flt.set_name("Audio / video")
+        for pat in ("audio/*", "video/*"):
+            flt.add_mime_type(pat)
+        d.add_filter(flt)
+        resp = d.run(); path = d.get_filename(); d.destroy()
+        if resp == Gtk.ResponseType.OK and path:
+            self.import_file(path)
+
+    def import_file(self, path):
+        if self.mode != "idle":
+            return
+        if not self.is_ready() and not self.run_setup():
+            return
+        self.set_mode("busy", T("Transcribing…"))
+
+        def work():
+            r = self.cli("import", path)
+            GLib.idle_add(self._stop_done, r)
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_new_meeting(self):
+        if self.mode != "idle":
+            return
+        self.listbox.unselect_all()
+        self.selected = None
+        self._update_stage()
+
+    def _build_recbar(self):
+        bar = Gtk.Box(spacing=14)
+        bar.set_margin_top(10); bar.set_margin_bottom(10)
+        bar.set_margin_start(18); bar.set_margin_end(18)
         self.status_lbl = Gtk.Label(label=T("Idle"))
         self.status_lbl.get_style_context().add_class("micro")
-        box.pack_start(self.status_lbl, False, False, 0)
+        bar.pack_start(self.status_lbl, False, False, 0)
+        self.timer_lbl = Gtk.Label(label="00:00")
+        self.timer_lbl.get_style_context().add_class("timer")
+        bar.pack_start(self.timer_lbl, False, False, 0)
+        self.stop_btn = Gtk.Button(label=T("Stop"))
+        self.stop_btn.get_style_context().add_class("quiet")
+        self.stop_btn.set_halign(Gtk.Align.END); self.stop_btn.set_hexpand(True)
+        self.stop_btn.connect("clicked", lambda *_: self.on_record())
+        bar.pack_start(self.stop_btn, True, True, 0)
+        return bar
 
-        self.rec_btn = Gtk.Button(label=T("Record"))
-        self.rec_btn.get_style_context().add_class("loud")
-        self.rec_btn.connect("clicked", lambda *_: self.on_record())
-        box.pack_start(self.rec_btn, False, False, 0)
-        return wrap
+    def _update_stage(self):
+        if self.mode in ("recording", "busy"):
+            self.stage.set_visible_child_name("view")
+            self.header.set_visible_child_name("rec")
+        elif self.selected is not None:
+            self.stage.set_visible_child_name("view")
+            self.header.set_visible_child_name("actions")
+        else:
+            self.stage.set_visible_child_name("new")
 
     @staticmethod
     def _saved_language():
@@ -671,22 +795,14 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             return
         self._live_text = text
         if text.strip():
-            body = "".join(
-                f"<p><span class='t'>{html.escape(t)}</span> "
-                f"<span class='s'>{html.escape(sp)}</span> {html.escape(rest)}</p>"
-                for t, sp, rest in (self._split_turn(l) for l in text.splitlines() if l.strip()))
-            note = "<p class='hint'>Transcribing as the meeting runs — the rest is written when you press Stop.</p>"
+            body = transcript_html(text)
+            note = f"<p class='hint'>{html.escape(T('Transcribing as the meeting runs — the rest is written when you press Stop.'))}</p>"
         else:
             body = ""
-            note = ("<p class='hint'>Listening. The first lines appear after about "
-                    "a minute of speech.</p>")
+            note = f"<p class='hint'>{html.escape(T('Listening. The first lines appear after about a minute of speech.'))}</p>"
         self.webview.load_html(
-            f"<style>{NOTE_CSS}"
-            ".t{color:#7C8B93;font-family:monospace;font-size:12px}"
-            ".s{color:#66B29D;font-weight:600}"
-            ".hint{color:#7C8B93;font-style:italic}"
-            "p{margin:6px 0}</style>"
-            f"<h2>Live transcript</h2>{note}{body}"
+            f"<style>{NOTE_CSS}.hint{{color:rgba(255,255,255,.5);font-style:italic}}</style>"
+            f"<h2>{html.escape(T('Live transcript'))}</h2>{note}{body}"
             "<script>window.scrollTo(0, document.body.scrollHeight);</script>", None)
 
     @staticmethod
@@ -736,26 +852,22 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         ctx = self.status_lbl.get_style_context()
         for c in ("status-rec", "status-busy"):
             ctx.remove_class(c)
-        btn = self.rec_btn.get_style_context()
-        for c in ("loud", "quiet"):
-            btn.remove_class(c)
         self.mode = mode
         self.lang_box.set_sensitive(mode == "idle")
-        if hasattr(self, "action_btns"):
-            self._refresh_actions()
         if mode == "recording":
             self.status_lbl.set_text(T("● RECORDING")); ctx.add_class("status-rec")
-            self.rec_btn.set_label(T("Stop")); btn.add_class("quiet")
-            self.rec_btn.set_sensitive(True); self.entry.set_sensitive(False)
+            self.stop_btn.set_label(T("Stop")); self.stop_btn.set_sensitive(True)
+            self.entry.set_sensitive(False); self.rec_btn.set_sensitive(False)
         elif mode == "busy":
             self.status_lbl.set_text(note or T("Working…")); ctx.add_class("status-busy")
-            self.rec_btn.set_label(T("Working…")); btn.add_class("quiet")
-            self.rec_btn.set_sensitive(False); self.entry.set_sensitive(False)
+            self.stop_btn.set_label(T("Working…")); self.stop_btn.set_sensitive(False)
+            self.entry.set_sensitive(False); self.rec_btn.set_sensitive(False)
         else:
             self.status_lbl.set_text(T("IDLE"))
-            self.rec_btn.set_label(T("Record")); btn.add_class("loud")
             self.rec_btn.set_sensitive(True); self.entry.set_sensitive(True)
             self.timer_lbl.set_text("00:00"); self.started_at = None
+        self._refresh_actions()
+        self._update_stage()
 
     def tick(self):
         # reconcile with the CLI every 5s so the UI stays correct when the
@@ -822,9 +934,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             lbl = Gtk.Label(label=T("No meetings yet."))
             lbl.get_style_context().add_class("empty")
             lbl.set_justify(Gtk.Justification.CENTER)
-            lbl.set_margin_top(40)
+            lbl.set_margin_top(20)
             row.add(lbl); self.listbox.add(row); self.listbox.show_all()
-            self.webview.load_html(welcome_html(), None)
             return
         for f in files:
             self.listbox.add(self._meeting_row(f))
@@ -907,9 +1018,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             self.selected = None
             self._refresh_actions()
             self._show_provider("")
+            self._update_stage()
             return
         self.selected = row.path
+        if self.mode != "idle":          # keep the live transcript on screen
+            return
         self._refresh_actions()
+        self._update_stage()
         try:
             md = row.path.read_text()
         except OSError as e:
