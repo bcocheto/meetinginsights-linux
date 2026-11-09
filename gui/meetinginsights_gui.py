@@ -29,6 +29,13 @@ from gi.repository import Gdk, GLib, Gtk, Notify, Pango, WebKit2  # noqa: E402
 HOME = Path.home()
 NOTES_DIR = Path(os.environ.get("MEETINGINSIGHTS_OUT", HOME / "MeetingNotes"))
 DATA_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights"))
+LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "meetinginsights" / "language"
+LANGUAGES = [  # (setting stored in the config file, label)
+    ("system", "Language: system default"),
+    ("auto", "Language: auto-detect"),
+    ("pt", "Português"), ("en", "English"), ("es", "Español"),
+    ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
+]
 REC_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights")) / "rec"
 CLI = os.environ.get("MEETINGINSIGHTS_CLI") or shutil.which("meetinginsights") or str(
     Path(__file__).resolve().parent.parent / "bin" / "meetinginsights")
@@ -339,6 +346,14 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.entry.connect("activate", lambda *_: self.on_record())
         box.pack_start(self.entry, True, True, 0)
 
+        self.lang_box = Gtk.ComboBoxText()
+        self.lang_box.set_tooltip_text("Spoken language of the meeting")
+        for key, label in LANGUAGES:
+            self.lang_box.append(key, label)
+        self.lang_box.set_active_id(self._saved_language())
+        self.lang_box.connect("changed", self.on_language_changed)
+        box.pack_start(self.lang_box, False, False, 0)
+
         self.timer_lbl = Gtk.Label(label="00:00")
         self.timer_lbl.get_style_context().add_class("timer")
         box.pack_start(self.timer_lbl, False, False, 0)
@@ -352,6 +367,24 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.rec_btn.connect("clicked", lambda *_: self.on_record())
         box.pack_start(self.rec_btn, False, False, 0)
         return box
+
+    @staticmethod
+    def _saved_language():
+        try:
+            value = LANG_FILE.read_text().strip()
+        except OSError:
+            value = ""
+        return value if value in {k for k, _ in LANGUAGES} else "system"
+
+    def on_language_changed(self, combo):
+        key = combo.get_active_id()
+        if not key:
+            return
+        try:
+            LANG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            LANG_FILE.write_text(key + "\n")
+        except OSError as e:
+            self.error_dialog("Could not save the language", str(e))
 
     # ---------- live transcript ----------
     def current_base(self):
@@ -443,6 +476,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         for c in ("loud", "quiet"):
             btn.remove_class(c)
         self.mode = mode
+        self.lang_box.set_sensitive(mode == "idle")
         if mode == "recording":
             self.status_lbl.set_text("● RECORDING"); ctx.add_class("status-rec")
             self.rec_btn.set_label("Stop"); btn.add_class("quiet")

@@ -6,6 +6,7 @@
 #   meetinginsights status                    show whether a recording is running
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
+#   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
 #
 # Nothing leaves the machine: audio is captured with PulseAudio, transcribed by
 # faster-whisper and summarised by a small local GGUF model via llama.cpp. There
@@ -31,7 +32,23 @@ done
 
 DATA_DIR="${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}"
 OUT_DIR="${MEETINGINSIGHTS_OUT:-$HOME/MeetingNotes}"
-WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-small.en}"
+# "small" is multilingual; "small.en" is English-only.
+WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-small}"
+# Spoken language: "system" (follow the OS locale), "auto" (detect), or a code (pt, en, ...).
+# Order: MEETINGINSIGHTS_LANGUAGE env > ~/.config/meetinginsights/language > system.
+LANG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/language"
+resolve_language() {
+    local l="${MEETINGINSIGHTS_LANGUAGE:-}"
+    [[ -z "$l" && -s "$LANG_FILE" ]] && l="$(head -n1 "$LANG_FILE" | tr -d '[:space:]')"
+    l="${l:-system}"
+    if [[ "$l" == system ]]; then
+        l="${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}"
+        l="${l%%[_.@]*}"
+        case "$l" in ""|C|POSIX) l=auto ;; esac
+    fi
+    echo "${l,,}"
+}
+export MEETINGINSIGHTS_LANGUAGE="$(resolve_language)"
 LLM_MODEL="${MEETINGINSIGHTS_LLM_MODEL:-$DATA_DIR/models/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
 LLM_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 YOU_LABEL="${MEETINGINSIGHTS_YOU:-You}"
@@ -339,13 +356,24 @@ cmd_notes() {
     return 1
 }
 
+cmd_language() {
+    if [[ $# -eq 0 ]]; then
+        echo "setting: $(head -n1 "$LANG_FILE" 2>/dev/null || echo system)  (in use: $MEETINGINSIGHTS_LANGUAGE)"
+        return 0
+    fi
+    [[ "$1" =~ ^(system|auto|[a-z]{2,3})$ ]] || die "invalid language: $1 (use system, auto, or a code like pt, en)"
+    mkdir -p "$(dirname "$LANG_FILE")" && echo "$1" > "$LANG_FILE"
+    echo "language set to: $1"
+}
+
 case "${1:-}" in
     start)  shift; cmd_start "$@" ;;
     stop)   cmd_stop ;;
     status) cmd_status ;;
     ready)  cmd_ready ;;
     setup)  shift; cmd_setup "$@" ;;
+    language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n '3,17p' "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,16p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac

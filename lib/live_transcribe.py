@@ -26,6 +26,9 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 
+_lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
+LANGUAGE = None if _lang == "auto" else _lang
+
 HEADER = 44                      # canonical PCM wav header parec writes
 RATE = 16000
 WINDOW_S = float(os.environ.get("MEETINGINSIGHTS_LIVE_WINDOW", "45"))
@@ -66,7 +69,7 @@ class Track:
 
 def main() -> int:
     base = Path(sys.argv[1])
-    model_size = sys.argv[2] if len(sys.argv) > 2 else "small.en"
+    model_size = sys.argv[2] if len(sys.argv) > 2 else "small"
     you = sys.argv[3] if len(sys.argv) > 3 else "You"
     them = sys.argv[4] if len(sys.argv) > 4 else "Participants"
 
@@ -95,6 +98,7 @@ def main() -> int:
             return
         segments, _ = model.transcribe(
             samples, beam_size=1, vad_filter=True,
+            language=LANGUAGE,
             vad_parameters={"min_silence_duration_ms": 400})
         for seg in segments:
             text = seg.text.strip()

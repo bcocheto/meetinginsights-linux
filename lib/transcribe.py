@@ -8,11 +8,15 @@ chronologically into a single labelled transcript.
 Usage: transcribe.py <wav> <out.txt> [model] [you_label] [them_label]
 """
 import re
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 from faster_whisper import WhisperModel
+
+_lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
+LANGUAGE = None if _lang == "auto" else _lang
 
 
 def channels_duplicated(left, right, rate, window_s=20):
@@ -120,7 +124,7 @@ def main() -> int:
     if sys.argv[1] == "--check-channels":
         return check_only(Path(sys.argv[2]))
     wav, out = Path(sys.argv[1]), Path(sys.argv[2])
-    model_size = sys.argv[3] if len(sys.argv) > 3 else "small.en"
+    model_size = sys.argv[3] if len(sys.argv) > 3 else "small"
     you = sys.argv[4] if len(sys.argv) > 4 else "You"
     them = sys.argv[5] if len(sys.argv) > 5 else "Them"
 
@@ -156,6 +160,7 @@ def main() -> int:
         print(f"  transcribing {label} ...", file=sys.stderr)
         segments, _ = model.transcribe(
             samples, beam_size=5, vad_filter=True,
+            language=LANGUAGE,
             vad_parameters={"min_silence_duration_ms": 500},
         )
         for seg in segments:
