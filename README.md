@@ -65,6 +65,22 @@ cp build/bin/llama build/bin/*.so* ~/.local/share/meetinginsights/llama/
 Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04
 and 22.04 — which is why the `.deb` ships its own build.
 
+## Settings
+
+Open the gear icon in the app (or use `meetinginsights config` / `meetinginsights language`).
+
+| Setting | Values | Default |
+|---|---|---|
+| Spoken language | `system` (follows the OS), `auto`, or a code such as `pt`, `en` | `system` |
+| Transcription model | `small`, `medium`, `large-v3-turbo` | `small` |
+| Who writes the notes | `local`, `claude-code`, `gemini-cli` | `local` |
+
+`claude-code` and `gemini-cli` use the CLI you already have installed and logged in;
+this app never sees your credentials. They send the transcript to that service, so
+they are opt-in. Per-meeting actions (rename, rewrite notes, transcribe again, edit
+the transcript, delete) are in the bar above the notes, and in the CLI as
+`meetinginsights rename|reprocess|delete <name>`.
+
 ## Use
 
 ```sh
