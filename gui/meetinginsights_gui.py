@@ -17,7 +17,12 @@ from pathlib import Path
 import gi
 
 gi.require_version("Gtk", "3.0")
-gi.require_version("WebKit2", "4.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("Pango", "1.0")
+try:
+    gi.require_version("WebKit2", "4.1")  # Ubuntu 24.04+ / 26.04
+except ValueError:
+    gi.require_version("WebKit2", "4.0")
 gi.require_version("Notify", "0.7")
 from gi.repository import Gdk, GLib, Gtk, Notify, Pango, WebKit2  # noqa: E402
 
