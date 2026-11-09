@@ -39,6 +39,8 @@ _PT = {
     "Could not summarize.": "Não foi possível resumir.",
     "None identified.": "Nenhum identificado.", "None recorded.": "Nenhuma registrada.",
     "None raised.": "Nenhuma levantada.",
+    "Notes written by {provider} from the transcript. The transcript was sent to that service.":
+        "Ata escrita por {provider} a partir da transcrição. A transcrição foi enviada a esse serviço.",
     "Notes written offline by a small local model. Structure and speaker "
     "attribution are derived from the transcript itself; only the prose "
     "summaries are model-generated.":
@@ -154,38 +156,52 @@ def main() -> int:
     title = sys.argv[4] if len(sys.argv) > 4 else "Meeting"
     minutes = sys.argv[5] if len(sys.argv) > 5 else "?"
 
-    if not LLAMA_BIN.exists():
-        print("llama binary not found", file=sys.stderr)
-        return 2
-
     turns = parse_turns(transcript.read_text())
     if not turns:
         print("no turns parsed", file=sys.stderr)
         return 3
-
     speakers = sorted({t["speaker"] for t in turns})
-    chunks = chunk(turns)
-    print(f"{len(turns)} turns, {len(chunks)} chunks, model={Path(model).name}", file=sys.stderr)
 
-    summaries = []
-    for i, ch in enumerate(chunks, 1):
-        print(f"  summarizing chunk {i}/{len(chunks)}", file=sys.stderr)
-        s = summarize_chunk(model, ch)
-        if s:
-            summaries.append((ch[0]["t"], s))
+    summaries, buckets, used_external = [], None, ""
+    provider = os.environ.get("MEETINGINSIGHTS_NOTES_PROVIDER", "local")
+    if provider != "local":
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import notes_external
+        print(f"writing notes with {provider}", file=sys.stderr)
+        result = notes_external.write_notes(provider, turns)
+        if result:
+            summaries, buckets = result
+            used_external = provider
+        else:
+            print(f"{provider} failed or is not installed; falling back to the local model",
+                  file=sys.stderr)
 
-    buckets = {c: [] for c in CLASSES}
-    substantive = [t for t in turns if len(t["text"].split()) >= 4]
-    for i, t in enumerate(substantive, 1):
-
-        buckets[classify(t)].append(t)
+    if buckets is None:
+        if not LLAMA_BIN.exists():
+            print("llama binary not found", file=sys.stderr)
+            return 2
+        chunks = chunk(turns)
+        print(f"{len(turns)} turns, {len(chunks)} chunks, model={Path(model).name}", file=sys.stderr)
+        for i, ch in enumerate(chunks, 1):
+            print(f"  summarizing chunk {i}/{len(chunks)}", file=sys.stderr)
+            s = summarize_chunk(model, ch)
+            if s:
+                summaries.append((ch[0]["t"], s))
+        buckets = {c: [] for c in CLASSES}
+        substantive = [t for t in turns if len(t["text"].split()) >= 4]
+        for t in substantive:
+            buckets[classify(t)].append(t)
 
     L = []
     L.append(f"# {title}\n")
     L.append(f"*{minutes} {T('minutes')} · {len(turns)} {T('turns')} · {T('participants')}: {', '.join(speakers)}*\n")
-    L.append("> " + T("Notes written offline by a small local model. Structure and speaker "
-             "attribution are derived from the transcript itself; only the prose "
-             "summaries are model-generated.") + "\n")
+    if used_external:
+        L.append("> " + T("Notes written by {provider} from the transcript. The transcript was "
+                          "sent to that service.").format(provider=used_external) + "\n")
+    else:
+        L.append("> " + T("Notes written offline by a small local model. Structure and speaker "
+                 "attribution are derived from the transcript itself; only the prose "
+                 "summaries are model-generated.") + "\n")
 
     L.append(f"## {T('Summary')}\n")
     L.extend(f"- {s}" for _, s in summaries) if summaries else L.append(f"_{T('Could not summarize.')}_")
