@@ -161,7 +161,8 @@ def main() -> int:
         segments, _ = model.transcribe(
             samples, beam_size=5, vad_filter=True,
             language=LANGUAGE,
-            vad_parameters={"min_silence_duration_ms": 500},
+            vad_parameters={"threshold": 0.3, "speech_pad_ms": 400,
+                            "min_silence_duration_ms": 500},
         )
         for seg in segments:
             text = seg.text.strip()

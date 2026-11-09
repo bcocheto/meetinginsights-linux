@@ -99,7 +99,8 @@ def main() -> int:
         segments, _ = model.transcribe(
             samples, beam_size=1, vad_filter=True,
             language=LANGUAGE,
-            vad_parameters={"min_silence_duration_ms": 400})
+            vad_parameters={"threshold": 0.3, "speech_pad_ms": 400,
+                            "min_silence_duration_ms": 400})
         for seg in segments:
             text = seg.text.strip()
             if text:
