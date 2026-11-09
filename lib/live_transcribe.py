@@ -29,6 +29,16 @@ from faster_whisper import WhisperModel
 _lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
 LANGUAGE = None if _lang == "auto" else _lang
 
+
+def load_model(size, **kw):
+    """Use the model already on disk, without contacting the Hugging Face hub.
+    Only when it is not cached yet does this fall back to downloading it."""
+    try:
+        return WhisperModel(size, device="cpu", compute_type="int8", local_files_only=True, **kw)
+    except Exception:  # noqa: BLE001 - not cached: one-time download
+        print(f"model {size} is not on disk yet; downloading it once", file=sys.stderr, flush=True)
+        return WhisperModel(size, device="cpu", compute_type="int8", **kw)
+
 HEADER = 44                      # canonical PCM wav header parec writes
 RATE = 16000
 WINDOW_S = float(os.environ.get("MEETINGINSIGHTS_LIVE_WINDOW", "45"))
@@ -83,8 +93,7 @@ def main() -> int:
 
     # Fewer threads than the batch path: this runs during the call, and the
     # meeting software needs the CPU more than we do.
-    model = WhisperModel(model_size, device="cpu", compute_type="int8",
-                         cpu_threads=THREADS)
+    model = load_model(model_size, cpu_threads=THREADS)
     print(f"live: model={model_size} threads={THREADS} window={WINDOW_S}s",
           file=sys.stderr, flush=True)
 
@@ -99,7 +108,7 @@ def main() -> int:
         segments, _ = model.transcribe(
             samples, beam_size=1, vad_filter=True,
             language=LANGUAGE,
-            vad_parameters={"threshold": 0.3, "speech_pad_ms": 400,
+            vad_parameters={"threshold": 0.2, "speech_pad_ms": 600,
                             "min_silence_duration_ms": 400})
         for seg in segments:
             text = seg.text.strip()

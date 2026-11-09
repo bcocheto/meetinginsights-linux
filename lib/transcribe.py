@@ -19,6 +19,16 @@ _lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
 LANGUAGE = None if _lang == "auto" else _lang
 
 
+def load_model(size, **kw):
+    """Use the model already on disk, without contacting the Hugging Face hub.
+    Only when it is not cached yet does this fall back to downloading it."""
+    try:
+        return WhisperModel(size, device="cpu", compute_type="int8", local_files_only=True, **kw)
+    except Exception:  # noqa: BLE001 - not cached: one-time download
+        print(f"model {size} is not on disk yet; downloading it once", file=sys.stderr, flush=True)
+        return WhisperModel(size, device="cpu", compute_type="int8", **kw)
+
+
 def channels_duplicated(left, right, rate, window_s=20):
     """True when both channels carry the same signal, merely time-shifted.
 
@@ -150,7 +160,7 @@ def main() -> int:
         tracks["Speaker"] = audio
 
     print(f"model={model_size} rate={rate}Hz channels={channels}", file=sys.stderr)
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    model = load_model(model_size)
 
     rows = []
     for label, samples in tracks.items():
@@ -161,7 +171,7 @@ def main() -> int:
         segments, _ = model.transcribe(
             samples, beam_size=5, vad_filter=True,
             language=LANGUAGE,
-            vad_parameters={"threshold": 0.3, "speech_pad_ms": 400,
+            vad_parameters={"threshold": 0.2, "speech_pad_ms": 600,
                             "min_silence_duration_ms": 500},
         )
         for seg in segments:

@@ -21,6 +21,9 @@ set -uo pipefail
 # an explicit prefix, a system install, a ~/.local install, or the source tree.
 _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX=""
+# Recordings and notes are private to this user, and nothing here phones home.
+umask 077
+export HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 for _c in "${MEETINGINSIGHTS_PREFIX:-}" \
           "$_bin_dir/../share/meetinginsights" \
           "/usr/share/meetinginsights" \
@@ -222,6 +225,7 @@ cmd_start() {
             echo "Note: the default input is a monitor of the speakers; using $real instead."
             src="$real"
         else
+    chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
             die "the default audio input is a monitor, not a microphone, and no real input was found — pick one in Sound settings"
         fi
     fi
