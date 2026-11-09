@@ -44,7 +44,7 @@ if [[ ! -x "$DATA/venv/bin/python" ]]; then
     echo "Creating the Python environment (this takes a minute)..."
     python3 -m venv "$DATA/venv"
     "$DATA/venv/bin/pip" install -q --upgrade pip
-    "$DATA/venv/bin/pip" install -q faster-whisper
+    "$DATA/venv/bin/pip" install -q faster-whisper python-docx reportlab
 fi
 
 if [[ ! -x "$DATA/llama/llama" ]]; then

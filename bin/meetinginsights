@@ -7,6 +7,11 @@
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
 #   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
+#   meetinginsights config [key [value]]     show or set whisper_model, notes_provider
+#   meetinginsights reprocess <name> [--notes-only]    transcribe again and rewrite the notes
+#   meetinginsights rename <name> <new title>          rename a meeting
+#   meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
+#   meetinginsights delete <name>                      delete a meeting's notes, transcript and audio
 #
 # Nothing leaves the machine: audio is captured with PulseAudio, transcribed by
 # faster-whisper and summarised by a small local GGUF model via llama.cpp. There
@@ -16,14 +21,14 @@
 # RIGHT, so who-said-what comes from audio routing rather than a guess.
 
 set -uo pipefail
+# Recordings and notes are private to this user, and nothing here phones home.
+umask 077
+export HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 
 # Find the library directory, whichever layout we are running from:
 # an explicit prefix, a system install, a ~/.local install, or the source tree.
 _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX=""
-# Recordings and notes are private to this user, and nothing here phones home.
-umask 077
-export HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 for _c in "${MEETINGINSIGHTS_PREFIX:-}" \
           "$_bin_dir/../share/meetinginsights" \
           "/usr/share/meetinginsights" \
@@ -35,8 +40,18 @@ done
 
 DATA_DIR="${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}"
 OUT_DIR="${MEETINGINSIGHTS_OUT:-$HOME/MeetingNotes}"
-# "small" is multilingual; "small.en" is English-only.
-WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-small}"
+# Settings live in ~/.config/meetinginsights/config as key=value lines. Environment
+# variables win over the file; see `meetinginsights config`.
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/config"
+cfg_get() { # cfg_get <key> <default>
+    local v=""
+    [[ -f "$CONFIG_FILE" ]] && v=$(sed -n "s/^$1=//p" "$CONFIG_FILE" | tail -n1)
+    echo "${v:-$2}"
+}
+# "small" is multilingual; "small.en" is English-only; "medium" is more accurate but slower.
+WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-$(cfg_get whisper_model small)}"
+# Who writes the notes: local (llama.cpp, nothing leaves the machine), claude-code or gemini-cli.
+export MEETINGINSIGHTS_NOTES_PROVIDER="${MEETINGINSIGHTS_NOTES_PROVIDER:-$(cfg_get notes_provider local)}"
 # Spoken language: "system" (follow the OS locale), "auto" (detect), or a code (pt, en, ...).
 # Order: MEETINGINSIGHTS_LANGUAGE env > ~/.config/meetinginsights/language > system.
 LANG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/language"
@@ -126,7 +141,7 @@ cmd_setup() {
         _pct 8
         _step "Installing speech recognition (a few minutes)"
         "$DATA_DIR/venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1
-        "$DATA_DIR/venv/bin/pip" install -q faster-whisper >/dev/null 2>&1 \
+        "$DATA_DIR/venv/bin/pip" install -q faster-whisper python-docx reportlab >/dev/null 2>&1 \
             || { echo "ERR|could not install faster-whisper"; return 1; }
         _pct 35
     else
@@ -206,10 +221,11 @@ cmd_start() {
     [[ -f "$STATE" ]] && die "already recording (see: meetinginsights status)"
     need parec; need ffmpeg; check_ready
     local title="${1:-meeting}" slug ts base
-    slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+    slug=$(echo "$title" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
     ts=$(date +%Y-%m-%d_%H-%M)
     base="$DATA_DIR/rec/${ts}_${slug}"
     mkdir -p "$DATA_DIR/rec" "$OUT_DIR"
+    chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
 
     local mon; mon=$(default_monitor)
     [[ -n "$mon" ]] || die "could not find the default audio sink (is PulseAudio or PipeWire running?)"
@@ -225,7 +241,6 @@ cmd_start() {
             echo "Note: the default input is a monitor of the speakers; using $real instead."
             src="$real"
         else
-    chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
             die "the default audio input is a monitor, not a microphone, and no real input was found — pick one in Sound settings"
         fi
     fi
@@ -364,6 +379,37 @@ cmd_notes() {
     return 1
 }
 
+cmd_config() {
+    local key="${1:-}" val="${2:-}"
+    if [[ -z "$key" ]]; then
+        echo "whisper_model=$WHISPER_MODEL"
+        echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
+        return 0
+    fi
+    [[ "$key" =~ ^(whisper_model|notes_provider)$ ]] || die "unknown setting: $key (whisper_model, notes_provider)"
+    if [[ -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
+    case "$key" in
+        notes_provider) [[ "$val" =~ ^(local|claude-code|gemini-cli)$ ]] || die "notes_provider must be local, claude-code or gemini-cli" ;;
+        whisper_model)  [[ "$val" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid model name: $val" ;;
+    esac
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+    touch "$CONFIG_FILE"
+    sed -i "/^$key=/d" "$CONFIG_FILE"
+    echo "$key=$val" >> "$CONFIG_FILE"
+    echo "$key=$val"
+}
+
+cmd_providers() { # prints the external note writers that are installed
+    "${PY:-python3}" - "$PREFIX/lib" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+import notes_external as n
+for p in ("claude-code", "gemini-cli"):
+    if n.available(p):
+        print(p)
+PYEOF
+}
+
 cmd_language() {
     if [[ $# -eq 0 ]]; then
         echo "setting: $(head -n1 "$LANG_FILE" 2>/dev/null || echo system)  (in use: $MEETINGINSIGHTS_LANGUAGE)"
@@ -374,14 +420,103 @@ cmd_language() {
     echo "language set to: $1"
 }
 
+# --- per-meeting actions: <name> is the file stem, e.g. 2026-11-09_14-36_meeting ---
+_valid_name() {
+    [[ -n "$1" && "$1" != */* && "$1" != *..* ]] || die "invalid name: ${1:-<empty>}"
+    [[ -e "$OUT_DIR/$1.md" || -e "$DATA_DIR/rec/$1.wav" || -e "$DATA_DIR/rec/$1.txt" ]] || die "no such meeting: $1"
+}
+
+_meeting_title() {
+    local t; t=$(sed -n '1s/^# //p' "$OUT_DIR/$1.md" 2>/dev/null)
+    echo "${t:-meeting}"
+}
+
+cmd_reprocess() {
+    local name="${1:-}" mode="${2:-}"
+    _valid_name "$name"
+    local base="$DATA_DIR/rec/$name" title mins d
+    title=$(_meeting_title "$name")
+    if [[ "$mode" != "--notes-only" ]]; then
+        [[ -s "$base.wav" ]] || die "the audio for this meeting was not kept: $base.wav"
+        echo "Transcribing again (model: $WHISPER_MODEL, language: $MEETINGINSIGHTS_LANGUAGE)..."
+        "$PY" "$PREFIX/lib/transcribe.py" "$base.wav" "$base.txt.new" \
+            "$WHISPER_MODEL" "$YOU_LABEL" "$THEM_LABEL" || true
+        [[ -s "$base.txt.new" ]] || { rm -f "$base.txt.new"; die "no speech was recognised; the old transcript was kept"; }
+        mv -f "$base.txt.new" "$base.txt"
+    fi
+    d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
+    mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
+    cmd_notes "$base.txt" "$title" "$mins"
+}
+
+cmd_rename() {
+    local name="${1:-}" new="${2:-}"
+    _valid_name "$name"
+    [[ -n "$new" ]] || die "usage: meetinginsights rename <name> <new title>"
+    local slug prefix newname
+    slug=$(echo "$new" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+    slug="${slug:-meeting}"
+    prefix=$(echo "$name" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}_' || true)
+    newname="${prefix}${slug}"
+    if [[ "$newname" != "$name" && ( -e "$OUT_DIR/$newname.md" || -e "$DATA_DIR/rec/$newname.wav" ) ]]; then
+        die "a meeting named $newname already exists"
+    fi
+    if [[ -f "$OUT_DIR/$name.md" ]]; then
+        # replace the heading only on the first line
+        sed -i "1s|^# .*|# ${new//|/\\|}|" "$OUT_DIR/$name.md"
+    fi
+    if [[ "$newname" != "$name" ]]; then
+        [[ -f "$OUT_DIR/$name.md" ]] && mv -n "$OUT_DIR/$name.md" "$OUT_DIR/$newname.md"
+        local ext
+        for ext in txt wav; do
+            [[ -f "$DATA_DIR/rec/$name.$ext" ]] && mv -n "$DATA_DIR/rec/$name.$ext" "$DATA_DIR/rec/$newname.$ext"
+        done
+    fi
+    echo "Renamed to: $newname"
+}
+
+cmd_export() {
+    local name="${1:-}" fmt="${2:-}" dest="" flag=""
+    shift 2 2>/dev/null || true
+    for a in "$@"; do [[ "$a" == "--no-transcript" ]] && flag="--no-transcript" || dest="$a"; done
+    _valid_name "$name"
+    [[ "$fmt" =~ ^(md|docx|pdf)$ ]] || die "usage: meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]"
+    [[ -n "$dest" ]] || dest="$OUT_DIR/exports/$name.$fmt"
+    "$PY" -c 'import docx, reportlab' 2>/dev/null || {
+        echo "Installing the export libraries..." >&2
+        "$DATA_DIR/venv/bin/pip" install -q python-docx reportlab >/dev/null 2>&1 \
+            || die "could not install python-docx and reportlab"
+    }
+    local lang=en
+    case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in pt*) lang=pt ;; esac
+    local txt="$DATA_DIR/rec/$name.txt"; [[ -f "$txt" ]] || txt="-"
+    "$PY" "$PREFIX/lib/export.py" "$OUT_DIR/$name.md" "$txt" "$dest" --lang "$lang" $flag
+}
+
+cmd_delete() {
+    local name="${1:-}"
+    _valid_name "$name"
+    if [[ -f "$STATE" ]] && [[ "$(head -n1 "$STATE")" == "$DATA_DIR/rec/$name" ]]; then
+        die "this meeting is being recorded right now"
+    fi
+    rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav"
+    echo "Deleted: $name"
+}
+
 case "${1:-}" in
     start)  shift; cmd_start "$@" ;;
     stop)   cmd_stop ;;
     status) cmd_status ;;
     ready)  cmd_ready ;;
     setup)  shift; cmd_setup "$@" ;;
+    reprocess) shift; cmd_reprocess "$@" ;;
+    rename) shift; cmd_rename "$@" ;;
+    export) shift; cmd_export "$@" ;;
+    delete) shift; cmd_delete "$@" ;;
+    providers) cmd_providers ;;
+    config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,16p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,21p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac
