@@ -19,14 +19,12 @@ _lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
 LANGUAGE = None if _lang == "auto" else _lang
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from whisper_loader import load_model as _load  # noqa: E402
+
+
 def load_model(size, **kw):
-    """Use the model already on disk, without contacting the Hugging Face hub.
-    Only when it is not cached yet does this fall back to downloading it."""
-    try:
-        return WhisperModel(size, device="cpu", compute_type="int8", local_files_only=True, **kw)
-    except Exception:  # noqa: BLE001 - not cached: one-time download
-        print(f"model {size} is not on disk yet; downloading it once", file=sys.stderr, flush=True)
-        return WhisperModel(size, device="cpu", compute_type="int8", **kw)
+    return _load(size, cpu_threads=kw.get("cpu_threads", 0))
 
 
 def channels_duplicated(left, right, rate, window_s=20):

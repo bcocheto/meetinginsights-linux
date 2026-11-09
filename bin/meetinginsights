@@ -7,7 +7,7 @@
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
 #   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
-#   meetinginsights config [key [value]]     show or set whisper_model, notes_provider
+#   meetinginsights config [key [value]]     show or set whisper_model, notes_provider, whisper_device
 #   meetinginsights reprocess <name> [--notes-only]    transcribe again and rewrite the notes
 #   meetinginsights rename <name> <new title>          rename a meeting
 #   meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
@@ -49,7 +49,13 @@ cfg_get() { # cfg_get <key> <default>
     echo "${v:-$2}"
 }
 # "small" is multilingual; "small.en" is English-only; "medium" is more accurate but slower.
-WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-$(cfg_get whisper_model small)}"
+# Default: the faster "turbo" model when the GPU libraries are installed, else "small".
+_default_model=small
+compgen -G "${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}/venv/lib/python*/site-packages/nvidia/cublas" >/dev/null 2>&1 \
+    && [[ "${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_device auto)}" != cpu ]] && _default_model=large-v3-turbo
+WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-$(cfg_get whisper_model "$_default_model")}"
+# Processor for speech recognition: auto (GPU when one is usable) or cpu.
+export MEETINGINSIGHTS_DEVICE="${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_device auto)}"
 # Who writes the notes: local (llama.cpp, nothing leaves the machine), claude-code or gemini-cli.
 export MEETINGINSIGHTS_NOTES_PROVIDER="${MEETINGINSIGHTS_NOTES_PROVIDER:-$(cfg_get notes_provider local)}"
 # Spoken language: "system" (follow the OS locale), "auto" (detect), or a code (pt, en, ...).
@@ -143,6 +149,9 @@ cmd_setup() {
         "$DATA_DIR/venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1
         "$DATA_DIR/venv/bin/pip" install -q faster-whisper python-docx reportlab >/dev/null 2>&1 \
             || { echo "ERR|could not install faster-whisper"; return 1; }
+        # NVIDIA GPU present: add the CUDA libraries (inside this environment only) for faster transcription
+        command -v nvidia-smi >/dev/null 2>&1 && \
+            "$DATA_DIR/venv/bin/pip" install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 >/dev/null 2>&1 || true
         _pct 35
     else
         _step "Python environment ready"; _pct 35
@@ -384,13 +393,15 @@ cmd_config() {
     if [[ -z "$key" ]]; then
         echo "whisper_model=$WHISPER_MODEL"
         echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
+        echo "whisper_device=$MEETINGINSIGHTS_DEVICE"
         return 0
     fi
-    [[ "$key" =~ ^(whisper_model|notes_provider)$ ]] || die "unknown setting: $key (whisper_model, notes_provider)"
+    [[ "$key" =~ ^(whisper_model|notes_provider|whisper_device)$ ]] || die "unknown setting: $key (whisper_model, notes_provider, whisper_device)"
     if [[ -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
         notes_provider) [[ "$val" =~ ^(local|claude-code|gemini-cli)$ ]] || die "notes_provider must be local, claude-code or gemini-cli" ;;
         whisper_model)  [[ "$val" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid model name: $val" ;;
+        whisper_device) [[ "$val" =~ ^(auto|cpu)$ ]] || die "whisper_device must be auto or cpu" ;;
     esac
     mkdir -p "$(dirname "$CONFIG_FILE")"
     touch "$CONFIG_FILE"
