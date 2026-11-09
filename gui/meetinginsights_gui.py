@@ -82,6 +82,53 @@ STRINGS = {
         "Could not read notes": "Não foi possível ler a ata",
         "Transcript": "Transcrição",
         "Show full transcript": "Mostrar a transcrição completa",
+        "Settings": "Configurações",
+        "Transcription model": "Modelo de transcrição",
+        "Small — fast (default)": "Small — rápido (padrão)",
+        "Medium — more accurate, slower": "Medium — mais preciso, mais lento",
+        "Large v3 turbo — most accurate, heaviest": "Large v3 turbo — o mais preciso, o mais pesado",
+        "Changing it downloads the model once (up to ~1.5 GB).":
+            "Ao trocar, o modelo é baixado uma vez (até ~1,5 GB).",
+        "Who writes the notes": "Quem escreve a ata",
+        "Local model (private, nothing leaves this computer)":
+            "Modelo local (privado, nada sai deste computador)",
+        "Claude Code (installed on this computer)": "Claude Code (instalado neste computador)",
+        "Gemini CLI (installed on this computer)": "Gemini CLI (instalado neste computador)",
+        "not installed": "não instalado",
+        "The transcript of each meeting will be sent to that service using your own account.":
+            "A transcrição de cada reunião será enviada a esse serviço, usando a sua própria conta.",
+        "Save": "Salvar",
+        "Could not save the settings": "Não foi possível salvar as configurações",
+        "Search meetings…": "Buscar reuniões…",
+        "Export": "Exportar",
+        "Markdown (.md)": "Markdown (.md)",
+        "Word (.docx)": "Word (.docx)",
+        "PDF (.pdf)": "PDF (.pdf)",
+        "Export meeting": "Exportar reunião",
+        "Include the transcript": "Incluir a transcrição",
+        "Exporting…": "Exportando…",
+        "Exported": "Exportado",
+        "Could not export": "Não foi possível exportar",
+        "Rename": "Renomear",
+        "Rewrite notes": "Refazer a ata",
+        "Transcribe again": "Transcrever de novo",
+        "Edit transcript": "Editar transcrição",
+        "Delete": "Excluir",
+        "Cancel": "Cancelar",
+        "Rename meeting": "Renomear reunião",
+        "New title": "Novo título",
+        "Delete this meeting?": "Excluir esta reunião?",
+        "This permanently deletes the notes, transcript and audio of “{name}”. It cannot be undone.":
+            "Isso exclui permanentemente a ata, a transcrição e o áudio de “{name}”. Não dá para desfazer.",
+        "Rewriting notes…": "Refazendo a ata…",
+        "Transcribing again…": "Transcrevendo de novo…",
+        "Deleting…": "Excluindo…",
+        "The action failed": "A ação falhou",
+        "Could not open the transcript": "Não foi possível abrir a transcrição",
+        "Rewrites the notes from the current transcript (use after editing it)":
+            "Refaz a ata a partir da transcrição atual (use depois de editá-la)",
+        "Transcribes the audio again with the current language and model":
+            "Transcreve o áudio de novo com o idioma e o modelo atuais",
     },
 }
 
@@ -106,90 +153,151 @@ CLI = os.environ.get("MEETINGINSIGHTS_CLI") or shutil.which("meetinginsights") o
     Path(__file__).resolve().parent.parent / "bin" / "meetinginsights")
 
 # ---------------------------------------------------------------- theme
-# Every colour, weight and radius lives here — the one-file design system the
-# iOS playbook prescribes, so a rebrand is a single edit rather than a sweep
-# through every view. Palette placeholders below; swap for the MeetingInsights
-# values to match the iPhone app exactly.
+# Same visual language as Gavetta: neutral dark surface, GNOME blue accent,
+# rounded cards, pill-shaped inputs and chips, hairline borders.
 THEME = {
-    "bg":            "#07090E",   # sampled from the app icon background
-    "bg_glow":       "#131A29",   # the icon's lit upper corner
-    "surface":       "#0D1219",
+    "bg":            "#222226",
+    "bg_bar":        "#1b1b1f",
+    "surface":       "rgba(255,255,255,0.055)",
+    "surface_hover": "rgba(255,255,255,0.13)",
+    "field":         "rgba(255,255,255,0.07)",
     "hairline":      "rgba(255,255,255,0.08)",
-    "accent":        "#66B29D",   # the icon's mint bubble
-    "accent_bright": "#93DFC7",   # the icon's sparkle — AI indicator only
-    "text_primary":  "#ECF2EF",
-    "text_secondary":"#7C8B93",
-    "danger":        "#C0563F",
+    "accent":        "#3584e4",
+    "accent_soft":   "#62a0ea",
+    "text_primary":  "#f2f2f2",
+    "text_secondary":"rgba(255,255,255,0.55)",
+    "danger":        "#e01b24",
+    "warn":          "#f5c211",
 }
 
 CSS = ("""
-window, .root {
-  background-image: radial-gradient(circle farthest-corner at 50%% 0%%, %(bg_glow)s 0%%, %(bg)s 60%%);
-  background-color: %(bg)s;
-}
-.sidebar { background: transparent; border-right: 1px solid %(hairline)s; }
+window, .root { background-color: %(bg)s; color: %(text_primary)s; }
+headerbar { background: %(bg_bar)s; border-bottom: 1px solid %(hairline)s; box-shadow: none; color: %(text_primary)s; }
+headerbar button { border-radius: 999px; background: transparent; border: none; box-shadow: none; color: %(text_secondary)s; }
+headerbar button:hover { background: %(surface_hover)s; color: %(text_primary)s; }
+.sidebar { background: transparent; }
 
-/* dramatic scale contrast: a thin hero numeral against tracked micro-labels */
 .timer {
-  font-family: monospace; font-size: 34px; font-weight: 200;
+  font-family: monospace; font-size: 30px; font-weight: 300;
   color: %(text_primary)s;
 }
 .micro {
-  font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
   color: %(text_secondary)s;
 }
 .status-rec  { color: %(danger)s; }
-.status-busy { color: %(accent)s; }
+.status-busy { color: %(accent_soft)s; }
 
-entry {
-  background: %(surface)s; color: %(text_primary)s;
-  border: 1px solid %(hairline)s; border-radius: 8px; padding: 9px 12px;
-  font-size: 14px;
+entry, searchentry {
+  background: %(field)s; color: %(text_primary)s; caret-color: %(accent_soft)s;
+  border: 1px solid %(hairline)s; border-radius: 999px; padding: 8px 16px;
+  font-size: 14px; box-shadow: none;
 }
-entry:focus { border-color: %(accent)s; }
+entry:focus, searchentry:focus { border-color: %(accent_soft)s; background: rgba(255,255,255,0.10); }
+searchentry { margin: 10px 10px 6px 10px; padding: 6px 12px; }
 
-/* one loud button, one quiet one — the whole accent-rationing rule */
+combobox button.combo {
+  background: %(field)s; color: %(text_primary)s; border: 1px solid %(hairline)s;
+  border-radius: 999px; padding: 6px 14px; box-shadow: none;
+}
+combobox button.combo:hover { background: %(surface_hover)s; }
+
 button.loud {
-  background: %(accent)s; color: #10131A; border: none;
-  border-radius: 8px; padding: 10px 22px; font-weight: 700;
+  background: %(accent)s; color: #ffffff; border: none; box-shadow: none;
+  border-radius: 999px; padding: 9px 24px; font-weight: 700;
 }
-button.loud:hover { background: shade(%(accent)s, 1.08); }
+button.loud:hover { background: %(accent_soft)s; }
 button.quiet {
   background: %(surface)s; color: %(text_primary)s;
-  border: 1px solid %(hairline)s; border-radius: 8px;
-  padding: 10px 22px; font-weight: 600;
+  border: 1px solid %(hairline)s; border-radius: 999px; box-shadow: none;
+  padding: 9px 24px; font-weight: 600;
 }
-button.quiet:hover { background: shade(%(surface)s, 1.3); }
+button.quiet:hover { background: %(surface_hover)s; }
 button.loud:disabled, button.quiet:disabled {
   background: %(surface)s; color: %(text_secondary)s; border: 1px solid %(hairline)s;
 }
 
+/* meeting list: one rounded card per meeting */
 list, list row { background: transparent; }
-list row { border-bottom: 1px solid %(hairline)s; padding: 12px 14px; }
-list row:selected { background: alpha(%(accent)s, 0.10); }
+list row {
+  margin: 3px 10px; padding: 10px 12px; border-radius: 12px;
+  background: %(surface)s; border: 1px solid rgba(255,255,255,0.05);
+}
+list row:hover { background: %(surface_hover)s; }
+list row:selected { background: alpha(%(accent_soft)s, 0.22); border-color: %(accent_soft)s; }
 .row-title { color: %(text_primary)s; font-weight: 600; }
-.row-meta  { color: %(text_secondary)s; font-size: 11px; letter-spacing: 0.5px; }
-.empty     { color: %(text_secondary)s; font-size: 13px; }
+.row-meta  { color: %(text_secondary)s; font-size: 11px; }
+.badge {
+  min-width: 32px; min-height: 32px; border-radius: 10px;
+  background: alpha(%(accent_soft)s, 0.25); color: #ffffff;
+}
+.empty { color: %(text_secondary)s; font-size: 13px; }
+
+/* action bar: chips, as in Gavetta's filters */
+button.chip {
+  padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: %(surface)s; color: rgba(255,255,255,0.75);
+  border: none; box-shadow: none;
+}
+button.chip:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
+button.chip.danger:hover { background: alpha(%(danger)s, 0.60); color: #ffffff; }
+button.chip:disabled { color: rgba(255,255,255,0.28); }
+
+dialog, messagedialog { background: %(bg)s; color: %(text_primary)s; }
 """ % THEME).encode()
 
 NOTE_CSS = """
 :root { color-scheme: dark; }
-body { background:#1c1f26; color:#d6d9e0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-       font-size: 14px; line-height: 1.65; padding: 26px 30px; margin:0; }
+body { background:#222226; color:#e6e6e8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+       font-size: 14px; line-height: 1.65; padding: 24px 28px; margin:0; }
 h1 { font-size: 21px; color:#fff; margin:0 0 4px; }
-h2 { font-size: 15px; color:#e6e6e6; margin: 26px 0 8px; padding-bottom:6px;
-     border-bottom:1px solid #2a2e37; }
-h3 { font-size: 13.5px; color:#cfd3dc; margin: 16px 0 4px; }
-table { border-collapse: collapse; width:100%; margin:10px 0; font-size:13px; }
-th { text-align:left; background:#262a33; color:#b8bccb; padding:7px 10px; border:1px solid #2a2e37; }
-td { padding:7px 10px; border:1px solid #2a2e33; vertical-align: top; }
-code { background:#262a33; padding:1px 5px; border-radius:4px; font-size:12.5px; }
-blockquote { border-left:3px solid #3b6fe0; margin:12px 0; padding:2px 14px; color:#b8bccb; }
+h2 { font-size: 13px; letter-spacing: .6px; text-transform: uppercase; color: rgba(255,255,255,.55);
+     margin: 26px 0 10px; font-weight: 700; }
+h3 { font-size: 13.5px; color:#e6e6e8; margin: 16px 0 4px; }
+table { border-collapse: separate; border-spacing: 0; width:100%; margin:10px 0; font-size:13px;
+        border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; }
+th { text-align:left; background:rgba(255,255,255,.07); color:rgba(255,255,255,.7); padding:8px 12px; }
+td { padding:8px 12px; border-top:1px solid rgba(255,255,255,.06); vertical-align: top; }
+code { background:rgba(255,255,255,.08); padding:1px 6px; border-radius:6px; font-size:12.5px; }
+blockquote { border-left:3px solid #62a0ea; margin:12px 0; padding:8px 14px; color:rgba(255,255,255,.65);
+             background:rgba(255,255,255,.04); border-radius:0 10px 10px 0; }
 strong { color:#fff; }
 ul,ol { padding-left: 22px; }
-li { margin: 3px 0; }
-a { color:#7aa2ff; }
+li { margin: 4px 0; }
+li::marker { color:#62a0ea; }
+a { color:#62a0ea; }
+pre { background:rgba(255,255,255,.05); border-radius:12px; padding:12px 14px; }
+.turn { margin: 0 0 16px; }
+.who { font-weight: 700; font-size: 13px; }
+.ts { font-weight: 400; font-size: 11px; margin-left: 8px; color: rgba(255,255,255,.38);
+      font-variant-numeric: tabular-nums; }
+.say { margin: 3px 0 0; padding: 1px 0 1px 12px; border-left: 2px solid var(--c); color: #e6e6e8; }
+em { color: rgba(255,255,255,.6); }
 """
+
+
+SPEAKER_COLORS = ["#62a0ea", "#57e389", "#f5c211", "#dc8add", "#ffa348", "#78aeed"]
+
+
+def transcript_html(text: str) -> str:
+    """The transcript as a conversation: consecutive lines from one speaker are merged."""
+    turns = []
+    for line in text.splitlines():
+        m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
+        if not m:
+            continue
+        t, who, say = m.group(1), m.group(2).strip(), m.group(3).strip()
+        if turns and turns[-1][1] == who:
+            turns[-1][2] += " " + say
+        else:
+            turns.append([t, who, say])
+    colors, parts = {}, []
+    for t, who, say in turns:
+        c = colors.setdefault(who, SPEAKER_COLORS[len(colors) % len(SPEAKER_COLORS)])
+        parts.append(f'<div class="turn" style="--c:{c}"><div class="who" style="color:{c}">'
+                     f'{html.escape(who)}<span class="ts">{t}</span></div>'
+                     f'<div class="say">{html.escape(say)}</div></div>')
+    return "".join(parts) or f"<pre>{html.escape(text)}</pre>"
 
 
 def md_to_html(md: str) -> str:
@@ -375,6 +483,10 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.refresh_btn.set_tooltip_text(T("Reload meetings"))
         self.refresh_btn.connect("clicked", lambda *_: self.load_meetings())
         hb.pack_end(self.refresh_btn)
+        self.settings_btn = Gtk.Button.new_from_icon_name("emblem-system-symbolic", Gtk.IconSize.BUTTON)
+        self.settings_btn.set_tooltip_text(T("Settings"))
+        self.settings_btn.connect("clicked", lambda *_: self.on_settings())
+        hb.pack_end(self.settings_btn)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         root.get_style_context().add_class("root")
@@ -382,7 +494,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         root.pack_start(self._build_controls(), False, False, 0)
 
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
-        paned.set_position(330)
+        paned.set_position(340)
         root.pack_start(paned, True, True, 0)
 
         sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
@@ -390,14 +502,29 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.listbox = Gtk.ListBox()
         self.listbox.connect("row-selected", self.on_select)
         sw.add(self.listbox)
-        paned.pack1(sw, False, False)
+        side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        side.get_style_context().add_class("sidebar")
+        self.search = Gtk.SearchEntry(placeholder_text=T("Search meetings…"))
+        self.search.connect("search-changed", lambda *_: self.listbox.invalidate_filter())
+        side.pack_start(self.search, False, False, 0)
+        side.pack_start(sw, True, True, 0)
+        self.listbox.set_filter_func(self._filter_row)
+        paned.pack1(side, False, False)
 
         self.webview = WebKit2.WebView()
-        self.webview.set_background_color(Gdk.RGBA(0.11, 0.12, 0.15, 1))
-        paned.pack2(self.webview, True, False)
+        self.webview.set_background_color(Gdk.RGBA(0.133, 0.133, 0.149, 1))
+        right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        right.pack_start(self._build_actions(), False, False, 0)
+        right.pack_start(self.webview, True, True, 0)
+        paned.pack2(right, True, False)
+        self.selected = None
 
         self.load_meetings()
+        first = self.listbox.get_row_at_index(0)
+        if first is not None and hasattr(first, "path"):
+            self.listbox.select_row(first)
         self.poll_state()
+        GLib.idle_add(lambda: (self.set_focus(None), False)[1])
         GLib.timeout_add(400, self._first_run_check)
         GLib.timeout_add_seconds(1, self.tick)
 
@@ -542,6 +669,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             btn.remove_class(c)
         self.mode = mode
         self.lang_box.set_sensitive(mode == "idle")
+        if hasattr(self, "action_btns"):
+            self._refresh_actions()
         if mode == "recording":
             self.status_lbl.set_text(T("● RECORDING")); ctx.add_class("status-rec")
             self.rec_btn.set_label(T("Stop")); btn.add_class("quiet")
@@ -630,6 +759,17 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             self.listbox.add(self._meeting_row(f))
         self.listbox.show_all()
 
+    def _filter_row(self, row):
+        q = self.search.get_text().strip().lower()
+        if not q or not hasattr(row, "path"):
+            return True
+        if q in row.path.stem.lower().replace("-", " ").replace("_", " "):
+            return True
+        try:
+            return q in row.path.read_text().lower()
+        except OSError:
+            return False
+
     def _meeting_row(self, path: Path):
         stem = path.stem
         m = re.match(r"(\d{4}-\d{2}-\d{2})[_-](\d{2})-(\d{2})_(.*)", stem)
@@ -642,21 +782,41 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             meta = m2.group(1)
         else:
             title, meta = stem.replace("-", " ").title(), ""
+        try:
+            with path.open(encoding="utf-8") as fh:
+                heading = fh.readline().strip()
+            if heading.startswith("# ") and len(heading) > 2:
+                title = heading[2:].strip()
+        except OSError:
+            pass
         row = Gtk.ListBoxRow()
         row.path = path
+        outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        badge = Gtk.Box()
+        badge.get_style_context().add_class("badge")
+        icon = Gtk.Image.new_from_icon_name("text-x-generic-symbolic", Gtk.IconSize.BUTTON)
+        icon.set_hexpand(True); icon.set_halign(Gtk.Align.CENTER); icon.set_valign(Gtk.Align.CENTER)
+        badge.pack_start(icon, True, True, 0)
+        badge.set_valign(Gtk.Align.CENTER); badge.set_halign(Gtk.Align.START); badge.set_hexpand(False)
+        outer.pack_start(badge, False, False, 0)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        outer.pack_start(box, True, True, 0)
         t = Gtk.Label(label=title, xalign=0)
         t.get_style_context().add_class("row-title")
         t.set_ellipsize(Pango.EllipsizeMode.END)
         d = Gtk.Label(label=meta, xalign=0)
         d.get_style_context().add_class("row-meta")
         box.pack_start(t, False, False, 0); box.pack_start(d, False, False, 0)
-        row.add(box)
+        row.add(outer)
         return row
 
     def on_select(self, _lb, row):
         if not row or not hasattr(row, "path"):
+            self.selected = None
+            self._refresh_actions()
             return
+        self.selected = row.path
+        self._refresh_actions()
         try:
             md = row.path.read_text()
         except OSError as e:
@@ -664,11 +824,252 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         transcript = REC_DIR / (row.path.stem + ".txt")
         html_doc = md_to_html(md)
         if transcript.exists():
-            t = html.escape(transcript.read_text())
-            html_doc += (f"<h2>{T('Transcript')}</h2><details><summary style='cursor:pointer;color:#7aa2ff'>"
-                         f"{T('Show full transcript')}</summary>"
-                         f"<pre style='white-space:pre-wrap;font-size:12.5px;color:#b8bccb'>{t}</pre></details>")
+            html_doc += f"<h2>{T('Transcript')}</h2>" + transcript_html(transcript.read_text())
         self.webview.load_html(html_doc, None)
+
+    def _build_actions(self):
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar.set_margin_top(8); bar.set_margin_bottom(8)
+        bar.set_margin_start(16); bar.set_margin_end(16)
+        self.action_btns = []
+        spec = [
+            ("Rename", None, self.on_rename),
+            ("Rewrite notes", "Rewrites the notes from the current transcript (use after editing it)", self.on_rewrite),
+            ("Transcribe again", "Transcribes the audio again with the current language and model", self.on_retranscribe),
+            ("Edit transcript", None, self.on_edit_transcript),
+            ("Export", None, self.on_export_menu),
+            ("Delete", None, self.on_delete),
+        ]
+        for label, tip, handler in spec:
+            b = Gtk.Button(label=T(label))
+            if tip:
+                b.set_tooltip_text(T(tip))
+            b.get_style_context().add_class("chip")
+            if label == "Delete":
+                b.get_style_context().add_class("danger")
+                b.set_halign(Gtk.Align.END); b.set_hexpand(True)
+            b.connect("clicked", lambda _b, h=handler: h())
+            b.set_sensitive(False)
+            bar.pack_start(b, False, False, 0)
+            self.action_btns.append(b)
+        return bar
+
+    def _refresh_actions(self):
+        enabled = self.selected is not None and getattr(self, "mode", "idle") == "idle"
+        for b in self.action_btns:
+            b.set_sensitive(enabled)
+
+    def _run_action(self, busy_text, *args, then_select=None):
+        self.set_mode("busy", T(busy_text))
+
+        def work():
+            r = self.cli(*args)
+            GLib.idle_add(self._action_done, r, then_select)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _action_done(self, r, then_select):
+        self.set_mode("idle")
+        if r.returncode != 0:
+            self.error_dialog(T("The action failed"), (r.stderr or r.stdout)[-800:])
+        keep = then_select
+        if keep == "__renamed__":
+            m = re.search(r"Renamed to: (\S+)", r.stdout)
+            keep = m.group(1) if m else (self.selected.stem if self.selected else None)
+        self.selected = None
+        self.load_meetings()
+        if keep:
+            for row in self.listbox.get_children():
+                if getattr(row, "path", None) and row.path.stem == keep:
+                    self.listbox.select_row(row)
+                    break
+        self._refresh_actions()
+        return False
+
+    def on_rename(self):
+        if not self.selected:
+            return
+        d = Gtk.Dialog(title=T("Rename meeting"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Rename"), Gtk.ResponseType.OK)
+        d.set_default_response(Gtk.ResponseType.OK)
+        box = d.get_content_area()
+        box.set_margin_top(12); box.set_margin_start(16); box.set_margin_end(16); box.set_margin_bottom(8)
+        entry = Gtk.Entry(placeholder_text=T("New title"), activates_default=True)
+        entry.set_width_chars(36)
+        box.pack_start(entry, False, False, 0)
+        d.show_all()
+        resp = d.run()
+        new = entry.get_text().strip()
+        d.destroy()
+        if resp == Gtk.ResponseType.OK and new:
+            self._run_action("Working…", "rename", self.selected.stem, new, then_select="__renamed__")
+
+    def on_rewrite(self):
+        if self.selected:
+            self._run_action("Rewriting notes…", "reprocess", self.selected.stem, "--notes-only",
+                             then_select=self.selected.stem)
+
+    def on_retranscribe(self):
+        if self.selected:
+            self._run_action("Transcribing again…", "reprocess", self.selected.stem,
+                             then_select=self.selected.stem)
+
+    def on_edit_transcript(self):
+        if not self.selected:
+            return
+        txt = REC_DIR / (self.selected.stem + ".txt")
+        try:
+            subprocess.Popen(["xdg-open", str(txt)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as e:
+            self.error_dialog(T("Could not open the transcript"), str(e))
+
+    def on_export_menu(self):
+        if not self.selected:
+            return
+        menu = Gtk.Menu()
+        for ext, label in (("pdf", "PDF (.pdf)"), ("docx", "Word (.docx)"), ("md", "Markdown (.md)")):
+            item = Gtk.MenuItem(label=T(label))
+            item.connect("activate", lambda _i, e=ext: self.on_export(e))
+            menu.append(item)
+        menu.show_all()
+        menu.popup_at_widget(self.action_btns[4], Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
+
+    def on_export(self, ext):
+        if not self.selected:
+            return
+        name = self.selected.stem
+        d = Gtk.FileChooserDialog(title=T("Export meeting"), transient_for=self,
+                                  action=Gtk.FileChooserAction.SAVE)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Export"), Gtk.ResponseType.OK)
+        d.set_do_overwrite_confirmation(True)
+        docs = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) or str(HOME)
+        d.set_current_folder(docs)
+        d.set_current_name(f"{name}.{ext}")
+        with_t = Gtk.CheckButton(label=T("Include the transcript"), active=True)
+        with_t.show()
+        d.set_extra_widget(with_t)
+        resp = d.run()
+        dest = d.get_filename()
+        include = with_t.get_active()
+        d.destroy()
+        if resp != Gtk.ResponseType.OK or not dest:
+            return
+        if not dest.lower().endswith("." + ext):
+            dest += "." + ext
+        args = ["export", name, ext, dest] + ([] if include else ["--no-transcript"])
+        self.set_mode("busy", T("Exporting…"))
+
+        def work():
+            r = self.cli(*args)
+            GLib.idle_add(self._export_done, r, dest)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _export_done(self, r, dest):
+        self.set_mode("idle")
+        if r.returncode == 0:
+            self.notify(T("Exported"), dest)
+        else:
+            self.error_dialog(T("Could not export"), (r.stderr or r.stdout)[-800:])
+        return False
+
+    def on_delete(self):
+        if not self.selected:
+            return
+        name = self.selected.stem
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.WARNING,
+                              text=T("Delete this meeting?"))
+        d.format_secondary_text(T("This permanently deletes the notes, transcript and audio of “{name}”. It cannot be undone.", name=name))
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Delete"), Gtk.ResponseType.OK)
+        d.set_default_response(Gtk.ResponseType.CANCEL)
+        resp = d.run(); d.destroy()
+        if resp == Gtk.ResponseType.OK:
+            self._run_action("Deleting…", "delete", name)
+
+    # ---------- settings ----------
+    MODELS = [
+        ("small", "Small — fast (default)"),
+        ("medium", "Medium — more accurate, slower"),
+        ("large-v3-turbo", "Large v3 turbo — most accurate, heaviest"),
+    ]
+    PROVIDERS = [
+        ("local", "Local model (private, nothing leaves this computer)"),
+        ("claude-code", "Claude Code (installed on this computer)"),
+        ("gemini-cli", "Gemini CLI (installed on this computer)"),
+    ]
+
+    def _cfg(self, key, default):
+        r = self.cli("config", key)
+        return (r.stdout.strip() or default) if r.returncode == 0 else default
+
+    def on_settings(self):
+        installed = set(self.cli("providers").stdout.split())
+        d = Gtk.Dialog(title=T("Settings"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Save"), Gtk.ResponseType.OK)
+        d.set_default_response(Gtk.ResponseType.OK)
+        box = d.get_content_area()
+        box.set_spacing(8)
+        box.set_margin_top(16); box.set_margin_bottom(8)
+        box.set_margin_start(20); box.set_margin_end(20)
+
+        def heading(text):
+            lbl = Gtk.Label(xalign=0)
+            lbl.set_markup(f"<b>{GLib.markup_escape_text(T(text))}</b>")
+            return lbl
+
+        box.pack_start(heading("Transcription model"), False, False, 0)
+        model_box = Gtk.ComboBoxText()
+        for key, label in self.MODELS:
+            model_box.append(key, T(label))
+        current_model = self._cfg("whisper_model", "small")
+        if current_model not in {k for k, _ in self.MODELS}:
+            model_box.append(current_model, current_model)
+        model_box.set_active_id(current_model)
+        box.pack_start(model_box, False, False, 0)
+        hint = Gtk.Label(label=T("Changing it downloads the model once (up to ~1.5 GB)."), xalign=0, wrap=True)
+        hint.get_style_context().add_class("dim-label")
+        box.pack_start(hint, False, False, 0)
+
+        box.pack_start(heading("Who writes the notes"), False, False, 6)
+        current_provider = self._cfg("notes_provider", "local")
+        radios, group = {}, None
+        for key, label in self.PROVIDERS:
+            ok = key == "local" or key in installed
+            text = T(label) if ok else f"{T(label)} — {T('not installed')}"
+            rb = Gtk.RadioButton.new_with_label_from_widget(group, text)
+            group = group or rb
+            rb.set_sensitive(ok)
+            rb.set_active(key == current_provider and ok)
+            radios[key] = rb
+            box.pack_start(rb, False, False, 0)
+        if not any(r.get_active() for r in radios.values()):
+            radios["local"].set_active(True)
+        warn = Gtk.Label(label=T("The transcript of each meeting will be sent to that service using your own account."),
+                         xalign=0, wrap=True)
+        warn.get_style_context().add_class("dim-label")
+        box.pack_start(warn, False, False, 0)
+
+        def sync_warn(*_):
+            warn.set_visible(not radios["local"].get_active())
+        for rb in radios.values():
+            rb.connect("toggled", sync_warn)
+        d.show_all()
+        sync_warn()
+        resp = d.run()
+        new_model = model_box.get_active_id() or current_model
+        new_provider = next((k for k, rb in radios.items() if rb.get_active()), "local")
+        d.destroy()
+        if resp != Gtk.ResponseType.OK:
+            return
+        for key, val in (("whisper_model", new_model), ("notes_provider", new_provider)):
+            r = self.cli("config", key, val)
+            if r.returncode != 0:
+                self.error_dialog(T("Could not save the settings"), r.stderr or r.stdout)
+                return
+        if new_model != current_model:
+            self.run_setup()        # downloads the new speech model if it is not cached yet
 
     # ---------- helpers ----------
     def notify(self, summary, body):
