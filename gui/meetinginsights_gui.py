@@ -102,6 +102,10 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "A recording was left unfinished": "Há uma gravação não concluída",
+        "The audio was saved. Process it now to get the transcript and notes?":
+            "O áudio foi salvo. Processar agora para obter a transcrição e a ata?",
+        "Later": "Depois", "Process now": "Processar agora",
         "Glossary for {client}": "Glossário de {client}",
         "Names and terms that this client uses. They help the transcription and the notes.":
             "Nomes e termos que esse cliente usa. Ajudam a transcrição e a ata.",
@@ -623,6 +627,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self._update_stage()
         GLib.idle_add(lambda: (self.set_focus(None), False)[1])
         GLib.timeout_add(400, self._first_run_check)
+        GLib.timeout_add(1500, self._recover_check)
         GLib.timeout_add_seconds(1, self.tick)
 
     # ---------- the "new meeting" page: record or import ----------
@@ -900,6 +905,28 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             return self.cli("ready").returncode == 0
         except Exception:
             return False
+
+    def _recover_check(self):
+        """Offer to finish a recording that was cut short (crash, power loss) or left without notes."""
+        if self.mode != "idle" or not self.is_ready():
+            return False
+        items = self.cli("recover", "--list").stdout.split()
+        if not items:
+            return False
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                              text=T("A recording was left unfinished"))
+        d.format_secondary_text(T("The audio was saved. Process it now to get the transcript and notes?"))
+        d.add_button(T("Later"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Process now"), Gtk.ResponseType.OK)
+        resp = d.run(); d.destroy()
+        if resp == Gtk.ResponseType.OK:
+            self.set_mode("busy", T("Transcribing…"))
+
+            def work():
+                r = self.cli("recover")
+                GLib.idle_add(self._stop_done, r)
+            threading.Thread(target=work, daemon=True).start()
+        return False
 
     def _first_run_check(self, force=False):
         if self.is_ready():

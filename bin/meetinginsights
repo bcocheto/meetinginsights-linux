@@ -6,6 +6,7 @@
 #   meetinginsights client [list|show|set|rm] NAME [terms...]   per-client glossary for names and terms
 #   meetinginsights stop                      stop, transcribe, write notes
 #   meetinginsights status                    show whether a recording is running
+#   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
 #   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
@@ -311,7 +312,10 @@ cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
 }
 
 cmd_start() {
-    [[ -f "$STATE" ]] && die "already recording (see: meetinginsights status)"
+    if [[ -f "$STATE" ]]; then
+        _rec_alive && die "already recording (see: meetinginsights status)"
+        die "an earlier recording was interrupted; finish it first with: meetinginsights recover"
+    fi
     need parec; need ffmpeg; check_ready
     _parse_meta_flags "$@"
     local title="${POS[0]:-meeting}" slug ts base
@@ -383,6 +387,9 @@ cmd_status() {
     [[ -f "$STATE" ]] || { echo "Not recording."; return 0; }
     local base title started
     { read -r base; read -r title; read -r started; } < "$STATE"
+    if ! _rec_alive; then
+        echo "Interrupted \"$title\" ($(basename "$base")): run meetinginsights recover"; return 0
+    fi
     echo "Recording \"$title\" for $(( ($(date +%s) - started) / 60 ))m ($(basename "$base"))"
 }
 
@@ -403,22 +410,14 @@ _voice_prefixes() { # sets _p_part and _p_spk according to the interface languag
 }
 _voice_prefixes
 
-cmd_stop() {
-    [[ -f "$STATE" ]] || die "not recording"
-    local base title started
-    { read -r base; read -r title; read -r started; } < "$STATE"
-    _meta_load "$base"; _meta_env
+# A capture process that is really ours (pid files survive crashes and reboots,
+# and the number may since belong to something else).
+_is_parec() { [[ -n "${1:-}" && -r "/proc/$1/cmdline" ]] && tr '\0' ' ' < "/proc/$1/cmdline" | grep -q parec; }
+_rec_alive() { [[ -f "$DATA_DIR/.mic.pid" ]] && _is_parec "$(cat "$DATA_DIR/.mic.pid")"; }
 
-    local p f
-    for p in mic sys; do
-        f="$DATA_DIR/.$p.pid"
-        [[ -f "$f" ]] && { kill "$(cat "$f")" 2>/dev/null; rm -f "$f"; }
-    done
-    sleep 1; rm -f "$STATE"
-
-    local mins=$(( ($(date +%s) - started) / 60 ))
-    echo "Stopped after ${mins}m. Merging channels..."
-    local d1 d2 dmax
+# Join the two capture files into one stereo file (mic left, system right).
+_merge_channels() { # _merge_channels <base>
+    local base="$1" d1 d2 dmax
     d1=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.mic.wav" 2>/dev/null)
     d2=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.sys.wav" 2>/dev/null)
     dmax=$(awk -v a="${d1:-0}" -v b="${d2:-0}" 'BEGIN{print (a>b)?a:b}')
@@ -437,6 +436,67 @@ cmd_stop() {
         echo "told apart. Keeping $(basename "$base").mic.wav and .sys.wav for diagnosis;" >&2
         echo "check the input device in Sound settings." >&2
     fi
+}
+
+# What an interrupted session left behind: recordings with audio but no notes.
+_pending_names() {
+    local f base name cur=""
+    [[ -f "$STATE" ]] && cur="$(head -n1 "$STATE")"
+    for f in "$DATA_DIR"/rec/*.wav; do
+        [[ -f "$f" ]] || continue
+        base="${f%.wav}"; name="$(basename "$base")"
+        [[ "$name" == *.mic || "$name" == *.sys ]] && continue
+        [[ "$base" == "$cur" || -f "$base.nospeech" || -f "$OUT_DIR/$name.md" ]] && continue
+        echo "$name"
+    done
+    for f in "$DATA_DIR"/rec/*.mic.wav; do   # captured, but never merged
+        [[ -f "$f" ]] || continue
+        base="${f%.mic.wav}"; name="$(basename "$base")"
+        [[ "$base" == "$cur" || -s "$base.wav" || ! -f "$base.sys.wav" ]] && continue
+        echo "$name"
+    done
+}
+
+cmd_recover() { # recover [--list]
+    local interrupted=0
+    [[ -f "$STATE" ]] && ! _rec_alive && interrupted=1
+    if [[ "${1:-}" == "--list" ]]; then
+        (( interrupted )) && echo "interrupted"
+        _pending_names | sed 's/^/pending:/'
+        return 0
+    fi
+    local did=0 name
+    if (( interrupted )); then
+        echo "Finishing the interrupted recording..."
+        cmd_stop || true; did=1
+    fi
+    while IFS= read -r name; do
+        [[ -n "$name" ]] || continue
+        echo "Processing $name..."
+        if [[ ! -s "$DATA_DIR/rec/$name.wav" ]]; then
+            need ffmpeg; _merge_channels "$DATA_DIR/rec/$name"
+        fi
+        cmd_reprocess "$name" || true; did=1
+    done < <(_pending_names)
+    (( did )) || echo "Nothing to recover."
+}
+
+cmd_stop() {
+    [[ -f "$STATE" ]] || die "not recording"
+    local base title started
+    { read -r base; read -r title; read -r started; } < "$STATE"
+    _meta_load "$base"; _meta_env
+
+    local p f
+    for p in mic sys; do
+        f="$DATA_DIR/.$p.pid"
+        [[ -f "$f" ]] && { _is_parec "$(cat "$f")" && kill "$(cat "$f")" 2>/dev/null; rm -f "$f"; }
+    done
+    sleep 1; rm -f "$STATE"
+
+    local mins=$(( ($(date +%s) - started) / 60 ))
+    echo "Stopped after ${mins}m. Merging channels..."
+    _merge_channels "$base"
 
     local live_pid="" used_live=0
     [[ -f "$DATA_DIR/.live.pid" ]] && { live_pid=$(cat "$DATA_DIR/.live.pid"); rm -f "$DATA_DIR/.live.pid"; }
@@ -466,6 +526,7 @@ cmd_stop() {
         echo "No speech was recognised in this recording." >&2
         [[ -n "$diag" ]] && echo "$diag" >&2
         echo "The audio is kept at $base.wav if you want to try again." >&2
+        touch "$base.nospeech"
         return 1
     fi
 
@@ -603,7 +664,7 @@ cmd_rename() {
     if [[ "$newname" != "$name" ]]; then
         [[ -f "$OUT_DIR/$name.md" ]] && mv -n "$OUT_DIR/$name.md" "$OUT_DIR/$newname.md"
         local ext
-        for ext in txt wav meta; do
+        for ext in txt wav meta nospeech; do
             [[ -f "$DATA_DIR/rec/$name.$ext" ]] && mv -n "$DATA_DIR/rec/$name.$ext" "$DATA_DIR/rec/$newname.$ext"
         done
     fi
@@ -663,7 +724,7 @@ cmd_delete() {
     if [[ -f "$STATE" ]] && [[ "$(head -n1 "$STATE")" == "$DATA_DIR/rec/$name" ]]; then
         die "this meeting is being recorded right now"
     fi
-    rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav" "$DATA_DIR/rec/$name.meta"
+    rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav" "$DATA_DIR/rec/$name.meta" "$DATA_DIR/rec/$name.nospeech"
     echo "Deleted: $name"
 }
 
@@ -678,11 +739,12 @@ case "${1:-}" in
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;
+    recover) shift; cmd_recover "$@" ;;
     client) shift; cmd_client "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,25p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,26p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac
