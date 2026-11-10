@@ -11,7 +11,9 @@
 [![Runs offline](https://img.shields.io/badge/runs-offline-1f8a4c)](#privacy)
 [![GPU optional](https://img.shields.io/badge/GPU-optional-d9731a)](#requirements)
 
-[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Settings](#settings) · [Privacy](#privacy)
+[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Obsidian](#obsidian) · [Settings](#settings) · [Privacy](#privacy)
+
+🌐 **English** · [Português (Brasil)](README.pt-BR.md)
 
 <br>
 
@@ -191,6 +193,8 @@ section with the lines of the transcript that mention it. It is not an instructi
 transcriber; use the glossary or the *Initial prompt* setting for that.
 
 ### Obsidian
+
+> Passo a passo em português: [README.pt-BR.md → Configurar o Obsidian](README.pt-BR.md#configurar-o-obsidian).
 
 Point the app at your vault once, then export any meeting from **Export → Obsidian note** (the
 app asks for the vault the first time) or with `meetinginsights obsidian <name>`:

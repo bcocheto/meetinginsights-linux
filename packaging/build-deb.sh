@@ -47,6 +47,7 @@ for sz in 16 22 24 32 48 64 128 256 512; do
 done
 install -m644 "$SRC/page.saurabh.MeetingInsights.desktop" "$B/usr/share/applications/page.saurabh.MeetingInsights.desktop"
 install -m644 "$SRC/README.md" "$B/usr/share/doc/meetinginsights/README.md"
+install -m644 "$SRC/README.pt-BR.md" "$B/usr/share/doc/meetinginsights/README.pt-BR.md"
 install -m644 "$SRC/LICENSE"  "$B/usr/share/doc/meetinginsights/copyright"
 gzip -9nc "$SRC/packaging/meetinginsights.1" > "$B/usr/share/man/man1/meetinginsights.1.gz"
 echo ".so man1/meetinginsights.1" | gzip -9n > "$B/usr/share/man/man1/meetinginsights-gui.1.gz"
