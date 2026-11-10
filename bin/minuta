@@ -18,6 +18,8 @@
 #   minuta import <audio|video> [title] [--client N] [--focus T]   transcribe an existing file and write the notes
 #   minuta reprocess <name> [--notes-only] [--client N] [--focus T]    transcribe again and rewrite the notes
 #   minuta rename <name> <new title>          rename a meeting
+#   minuta toggle [title]                     start, or stop and write the notes (for a keyboard shortcut)
+#   minuta shortcut [show|set <keys>|remove]  keyboard shortcut for toggle, e.g. '<Super><Alt>r' (GNOME)
 #   minuta speakers <name> ["Old=New" ...]     list the speakers, or rename them in the transcript and the notes
 #   minuta export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
 #   minuta delete <name>                      delete a meeting's notes, transcript and audio
@@ -743,6 +745,47 @@ cmd_rename() {
     echo "Renamed to: $newname"
 }
 
+_notify() { command -v notify-send >/dev/null && notify-send -a Minuta -i minuta "$1" "${2:-}" 2>/dev/null || true; }
+
+# One key for everything: start when idle; stop, queue and write the notes in the background when recording.
+cmd_toggle() {
+    local self; self="$(readlink -f "${BASH_SOURCE[0]}")"
+    if [[ -f "$STATE" ]]; then
+        if ! _rec_alive; then
+            _notify "Minuta" "An earlier recording was interrupted. Open Minuta to recover it."
+            die "an earlier recording was interrupted; finish it first with: minuta recover"
+        fi
+        local out name
+        out=$(cmd_stop --capture-only 2>&1) || { _notify "Minuta" "Could not stop the recording"; echo "$out" >&2; return 1; }
+        echo "$out"
+        name=$(sed -n 's/^Queued: //p' <<<"$out" | head -1)
+        _notify "Minuta" "Recording stopped. Writing the notes…"
+        if [[ -n "$name" ]]; then
+            ( setsid "$self" finish "$name" >"$DATA_DIR/.toggle-finish.log" 2>&1 \
+                && "$self" _notify_done "$name" || "$self" _notify_fail ) </dev/null >/dev/null 2>&1 &
+            disown 2>/dev/null || true
+        fi
+        return 0
+    fi
+    local out
+    if out=$(cmd_start "$@" 2>&1); then
+        echo "$out"; _notify "Minuta" "Recording started"
+    else
+        echo "$out" >&2; _notify "Minuta" "Could not start: $(tail -1 <<<"$out")"; return 1
+    fi
+}
+
+cmd_shortcut() {
+    local self; self="$(command -v minuta 2>/dev/null || readlink -f "${BASH_SOURCE[0]}")"
+    case "${1:-show}" in
+        show)   python3 -I "$PREFIX/lib/shortcut.py" show ;;
+        set)    [[ -n "${2:-}" ]] || die "usage: minuta shortcut set <keys>   (example: '<Super><Alt>r')"
+                python3 -I "$PREFIX/lib/shortcut.py" set "$2" "$self toggle" ;;
+        remove) python3 -I "$PREFIX/lib/shortcut.py" remove ;;
+        *)      die "usage: minuta shortcut [show|set <keys>|remove]" ;;
+    esac
+}
+
 cmd_speakers() {
     local name="${1:-}"; shift || true
     _valid_name "$name"
@@ -879,6 +922,10 @@ case "${1:-}" in
     reprocess) shift; cmd_reprocess "$@" ;;
     rename) shift; cmd_rename "$@" ;;
     speakers) shift; cmd_speakers "$@" ;;
+    toggle) shift; cmd_toggle "$@" ;;
+    shortcut) shift; cmd_shortcut "$@" ;;
+    _notify_done) _notify "Notes ready" "$(echo "${2:-}" | sed -E 's/^[0-9-]+_[0-9-]+_//')" ;;
+    _notify_fail) _notify "Minuta" "The notes failed; open Minuta to retry" ;;
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;

@@ -71,6 +71,16 @@ class Cli(unittest.TestCase):
         self.assertIn("[00:01] Ana: oi", (self.home / "rec" / f"{name}.txt").read_text())
         self.assertNotEqual(self.run_cli("speakers", name, "Ninguem=Z").returncode, 0)
 
+    def test_toggle_refuses_an_interrupted_recording(self):
+        (self.home / "current").write_text(f"{self.home}/rec/x\nTitulo\n0\n")
+        r = self.run_cli("toggle")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("interrupted", r.stderr)
+
+    def test_shortcut_rejects_garbage(self):
+        self.assertNotEqual(self.run_cli("shortcut", "set").returncode, 0)
+        self.assertNotEqual(self.run_cli("shortcut", "bogus").returncode, 0)
+
     def test_search_command(self):
         (self.out / "2026-11-10_11-00_a.md").write_text("# Reunião A\n\n- Preço de entrada: 8%.\n")
         (self.home / "rec" / "2026-11-10_11-00_a.meta").write_text("client=Acme\n")

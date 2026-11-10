@@ -223,6 +223,9 @@ STRINGS = {
         "Transcribe again": "Transcrever de novo",
         "Edit transcript": "Editar transcrição",
         "Speakers": "Falantes",
+        "Keyboard shortcut": "Atalho de teclado",
+        "Starts and stops a recording from anywhere, for example <Super><Alt>r. Leave it empty for none. Needs GNOME.": "Inicia e para uma gravação de qualquer lugar, por exemplo <Super><Alt>r. Deixe vazio para não usar. Precisa do GNOME.",
+        "Could not set the shortcut": "Não foi possível definir o atalho",
         "Rename speakers": "Renomear falantes",
         "Type the real name next to each speaker; leave it empty to keep it. Two speakers with the same name are merged.": "Digite o nome real ao lado de cada falante; deixe vazio para manter. Dois falantes com o mesmo nome são unidos.",
         "lines": "falas",
@@ -1245,6 +1248,13 @@ class MinutaWindow(Gtk.ApplicationWindow):
                 live = "Recording" in self.cli("status").stdout
             except Exception:
                 live = self.mode == "recording"
+            try:
+                stamp = NOTES_DIR.stat().st_mtime
+            except OSError:
+                stamp = 0
+            if stamp != getattr(self, "_notes_stamp", stamp) and self.mode == "idle":
+                self.load_meetings()
+            self._notes_stamp = stamp
             if live and self.mode == "idle":
                 self.poll_state()
             elif not live and self.mode == "recording":
@@ -1948,6 +1958,14 @@ class MinutaWindow(Gtk.ApplicationWindow):
         threads_row.pack_end(threads, False, False, 0)
         box.pack_start(threads_row, False, False, 0)
 
+        # ---- keyboard shortcut (GNOME custom shortcut that runs `minuta toggle`)
+        current_keys = (lambda r: r.stdout.strip() if r.returncode == 0 else "")(self.cli("shortcut", "show"))
+        box.pack_start(heading("Keyboard shortcut"), False, False, 0)
+        keys_entry = Gtk.Entry(text=current_keys, placeholder_text="<Super><Alt>r")
+        box.pack_start(keys_entry, False, False, 0)
+        box.pack_start(note("Starts and stops a recording from anywhere, for example <Super><Alt>r. "
+                            "Leave it empty for none. Needs GNOME."), False, False, 0)
+
         # ---- notes writer
         box.pack_start(heading("Who writes the notes"), False, False, 0)
         current_notes_model = self._cfg("notes_model", "small")
@@ -1992,9 +2010,14 @@ class MinutaWindow(Gtk.ApplicationWindow):
             "notes_model": notes_model_box.get_active_id() or current_notes_model,
             "notes_provider": next((k for k, rb in radios.items() if rb.get_active()), "local"),
         }
+        new_keys = keys_entry.get_text().strip()
         d.destroy()
         if resp != Gtk.ResponseType.OK:
             return
+        if new_keys != current_keys:
+            r = self.cli("shortcut", "set", new_keys) if new_keys else self.cli("shortcut", "remove")
+            if r.returncode != 0:
+                self.error_dialog(T("Could not set the shortcut"), (r.stderr or r.stdout)[-400:])
         for key, val in new.items():
             r = self.cli("config", key, val)
             if r.returncode != 0:

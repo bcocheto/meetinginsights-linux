@@ -177,6 +177,8 @@ minuta import call.mp4 "Kickoff" --client "Acme"
 minuta notes <transcript.txt>     # regenerate notes from a transcript
 minuta reprocess <name> [--notes-only] [--client N] [--focus T]
 minuta rename <name> "New title"
+minuta toggle                                # start, or stop and write the notes (one key for both)
+minuta shortcut set "<Super><Alt>r"          # make that a GNOME keyboard shortcut (also in Settings)
 minuta speakers <name>                       # list the speakers
 minuta speakers <name> "Speaker 2=Maria"     # rename them in the transcript and the notes
 minuta export <name> <md|docx|pdf> [file] [--no-transcript]
