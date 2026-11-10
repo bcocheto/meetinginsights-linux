@@ -38,6 +38,7 @@ possible, but it is off unless you turn it on.
 | 📝 **Useful notes** | Summary with an overview, action items with owners, decisions, open questions. Portuguese and English. |
 | 🎯 **Client and focus** | A saved **glossary** of names and terms per client, and a **focus** ("what matters in this meeting") that gets its own *In focus* section. |
 | 🔊 **Input meters** | Live levels for the microphone and the call audio, with a warning when one of them goes quiet — a dead input is caught in seconds, not after the meeting. |
+| 🟣 **Obsidian export** | Save a meeting as a note in your vault: frontmatter, a foldable transcript, a link back to the client's hub and a line in its index, so the note is reachable from the rest of the vault. |
 | 🔎 **Search everything** | Find a meeting by what was said — in the notes *and* the transcript, ignoring case and accents — and filter by client. Matches are highlighted in the notes. |
 | 🛟 **Crash recovery** | A recording cut short (crash, power loss) is finished on the next launch, and audio that never got notes is offered for processing. |
 | 📤 **Export and edit** | Rename, rewrite the notes, transcribe again, edit the transcript, delete; export to Markdown, Word (`.docx`) or PDF. |
@@ -160,6 +161,7 @@ meetinginsights reprocess <name> [--notes-only] [--client N] [--focus T]
 meetinginsights rename <name> "New title"
 meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]
 meetinginsights delete <name>
+meetinginsights obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault
 meetinginsights search [--client N] words  # find meetings by what was said
 meetinginsights recover [--list]           # finish an interrupted recording
 ```
@@ -188,6 +190,35 @@ The *focus* is free text for one meeting. It steers the summary and fills the **
 section with the lines of the transcript that mention it. It is not an instruction to the
 transcriber; use the glossary or the *Initial prompt* setting for that.
 
+### Obsidian
+
+Point the app at your vault once, then export any meeting from **Export → Obsidian note** (the
+app asks for the vault the first time) or with `meetinginsights obsidian <name>`:
+
+```sh
+meetinginsights config obsidian_vault ~/Documents/MyVault
+meetinginsights config obsidian_folder "Clients/{client}/Meetings"   # default: Meetings
+```
+
+The note is named `YYYY-MM-DD - Title.md`, with frontmatter (`type`, `created`, `updated`,
+the date, client, participants, duration, `tags`, the source and the meeting id), the notes as
+written, and the transcript in a foldable `[!note]-` callout (`--no-transcript` leaves it out).
+Frontmatter keys follow the interface language (Portuguese or English). Exporting again updates
+the same file; a note of yours that happens to have the same name is never overwritten, and
+nothing is ever written outside the vault.
+
+For each client you can also say where its meetings live and how to reach them:
+
+```sh
+meetinginsights client config "Acme" folder "Clients/Acme/Meetings"
+meetinginsights client config "Acme" hub    "Clients/Acme/_HUB"          # linked at the top of the note
+meetinginsights client config "Acme" index  "Clients/Acme/Meetings/Index" # a row (or bullet) is added
+```
+
+These are also in the app, under **Glossary**. The index gets one new row if it has a table
+(matching its columns) or one bullet otherwise, and its `updated:` date is refreshed; a meeting
+already listed is not added twice.
+
 ## Settings
 
 Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
@@ -207,6 +238,7 @@ Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
 | Tell voices apart | `diarize` on/off, `speakers` 0 (auto) to 8 | on |
 | Initial prompt | names and jargon to help spelling (`prompt`, up to 500 characters) | empty |
 | Accuracy | `beam` 1 (fast) to 10 | 5 |
+| Obsidian vault / folder | `obsidian_vault` (path), `obsidian_folder` (inside the vault; `{client}` allowed) | unset / `Meetings` |
 | Even out volume / threads | `normalize` on/off, `threads` 0 = auto | off / 0 |
 
 </td>

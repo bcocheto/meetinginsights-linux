@@ -7,6 +7,7 @@
 #   meetinginsights stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
 #                                             recording; finish later with: meetinginsights finish <name>)
 #   meetinginsights status                    show whether a recording is running
+#   meetinginsights obsidian <name> [--folder P]   save a meeting as a note in your Obsidian vault
 #   meetinginsights search [--client NAME] words   find meetings by what was said, in notes and transcripts
 #   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
@@ -303,15 +304,23 @@ cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
     local name="${1:-}" f
     case "$sub" in
         list) for f in "$CLIENTS_DIR"/*.txt; do [[ -f "$f" ]] && head -n1 "$f"; done; return 0 ;;
-        show|rm|set) [[ -n "$name" ]] || die "usage: meetinginsights client $sub <name>${sub/#set/ <terms...>}" ;;
-        *) die "usage: meetinginsights client [list|show <name>|set <name> <terms...>|rm <name>]" ;;
+        show|rm|set|config) [[ -n "$name" ]] || die "usage: meetinginsights client $sub <name>${sub/#set/ <terms...>}" ;;
+        *) die "usage: meetinginsights client [list|show <name>|set <name> <terms...>|rm <name>|config <name> folder|hub|index <vault path>]" ;;
     esac
     shift
     f="$CLIENTS_DIR/$(_slug "$name").txt"
     [[ -n "$(_slug "$name")" ]] || die "invalid client name: $name"
     case "$sub" in
         show) [[ -f "$f" ]] || die "no such client: $name"; sed -n '2,$p' "$f" ;;
-        rm)   [[ -f "$f" ]] || die "no such client: $name"; rm -f "$f"; echo "Removed client: $name" ;;
+        rm)   [[ -f "$f" ]] || die "no such client: $name"; rm -f "$f" "${f%.txt}.cfg"; echo "Removed client: $name" ;;
+        config) # per-client Obsidian settings: folder, hub (note to link back to), index (note that lists the meetings)
+              local key="${1:-}" cval="${2:-}" cf="${f%.txt}.cfg"
+              [[ -z "$key" ]] && { cat "$cf" 2>/dev/null; return 0; }
+              [[ "$key" =~ ^(folder|hub|index)$ ]] || die "usage: meetinginsights client config <name> folder|hub|index <path inside the vault>"
+              [[ "$cval" != /* && "$cval" != *..* ]] || die "use a path inside the vault"
+              mkdir -p "$CLIENTS_DIR"; [[ -f "$f" ]] || printf '%s\n\n' "${name:0:80}" > "$f"
+              touch "$cf"; sed -i "/^$key=/d" "$cf"; [[ -n "$cval" ]] && echo "$key=$cval" >> "$cf"
+              echo "$key=$cval" ;;
         set)  local terms="$*"
               terms="$(echo "$terms" | tr '\n\r' '  ')"
               mkdir -p "$CLIENTS_DIR"
@@ -587,12 +596,14 @@ cmd_notes() {
     return 1
 }
 
-CONFIG_KEYS="whisper_model notes_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
+CONFIG_KEYS="obsidian_vault obsidian_folder whisper_model notes_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
 cmd_config() {
     local key="${1:-}"; shift || true
     local val="$*"
     if [[ -z "$key" ]]; then
         echo "whisper_model=$WHISPER_MODEL"
+        echo "obsidian_vault=$(cfg_get obsidian_vault "")"
+        echo "obsidian_folder=$(cfg_get obsidian_folder Meetings)"
         echo "notes_model=$MEETINGINSIGHTS_NOTES_MODEL"
         echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
         echo "whisper_device=$MEETINGINSIGHTS_DEVICE"
@@ -607,6 +618,8 @@ cmd_config() {
     [[ " $CONFIG_KEYS " == *" $key "* ]] || die "unknown setting: $key ($CONFIG_KEYS)"
     if [[ $# -eq 0 && -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
+        obsidian_vault) val="${val/#\~/$HOME}"; [[ -z "$val" || -d "$val" ]] || die "not a folder: $val" ;;
+        obsidian_folder) [[ "$val" != /* && "$val" != *..* ]] || die "use a path inside the vault, like Meetings or Clients/{client}/Meetings" ;;
         notes_model)    [[ "$val" =~ ^(small|medium)$ ]] || die "notes_model must be small or medium" ;;
         notes_provider) [[ "$val" =~ ^(local|claude-code|gemini-cli)$ ]] || die "notes_provider must be local, claude-code or gemini-cli" ;;
         whisper_model)  [[ "$val" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid model name: $val" ;;
@@ -757,6 +770,24 @@ cmd_export() {
     "$PY" "$PREFIX/lib/export.py" "$OUT_DIR/$name.md" "$txt" "$dest" --lang "$lang" $flag
 }
 
+cmd_obsidian() { # obsidian <name> [--folder PATH] [--no-transcript]
+    local name="" folder="" with=1
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --folder) [[ $# -ge 2 ]] || die "--folder needs a path"; folder="$2"; shift 2 ;;
+            --no-transcript) with=0; shift ;;
+            *) name="$1"; shift ;;
+        esac
+    done
+    [[ -n "$name" ]] || die "usage: meetinginsights obsidian <name> [--folder PATH] [--no-transcript]"
+    _valid_name "$name"
+    local vault; vault="$(cfg_get obsidian_vault "")"; vault="${vault/#\~/$HOME}"
+    [[ -n "$vault" ]] || die "no vault set: meetinginsights config obsidian_vault ~/path/to/vault"
+    local lang=en; case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in pt*) lang=pt ;; esac
+    "$(command -v python3)" "$PREFIX/lib/obsidian.py" "$name" "$OUT_DIR" "$DATA_DIR/rec" "$vault" \
+        "$(cfg_get obsidian_folder Meetings)" "$CLIENTS_DIR" "$lang" "$with" "$folder"
+}
+
 cmd_delete() {
     local name="${1:-}"
     _valid_name "$name"
@@ -780,12 +811,13 @@ case "${1:-}" in
     delete) shift; cmd_delete "$@" ;;
     finish) shift; cmd_finish "$@" ;;
     recover) shift; cmd_recover "$@" ;;
+    obsidian) shift; cmd_obsidian "$@" ;;
     search) shift; cmd_search "$@" ;;
     client) shift; cmd_client "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,28p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,29p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac

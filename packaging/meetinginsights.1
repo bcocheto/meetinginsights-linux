@@ -41,6 +41,11 @@ Finish a recording that was cut short and process audio left without minutes.
 .BI "import " file " [title]"
 Transcribe an existing audio or video file and write the minutes.
 .TP
+.BI "obsidian " name " [--folder " path "] [--no-transcript]"
+Save a meeting as a note, with frontmatter and the transcript, in the Obsidian vault set with
+\fBconfig obsidian_vault\fR. Per-client folder, hub and index notes are set with
+\fBclient config\fR. Nothing is written outside the vault.
+.TP
 .BI "search [--client " name "] " words
 Find meetings by what was said, in the minutes and the transcripts. Ignores case
 and accents; every word must match, and a quoted phrase must match as written.

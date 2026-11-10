@@ -104,6 +104,14 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Obsidian note": "Nota no Obsidian", "Choose the Obsidian vault…": "Escolher o vault do Obsidian…",
+        "Choose the Obsidian vault": "Escolher o vault do Obsidian", "Select": "Selecionar",
+        "Could not export to Obsidian": "Não foi possível exportar para o Obsidian",
+        "Saved in Obsidian": "Salvo no Obsidian",
+        "In your Obsidian vault (optional)": "No seu vault do Obsidian (opcional)",
+        "Folder for this client's meetings, e.g. Clients/Acme/Meetings": "Pasta das reuniões deste cliente, ex.: Clientes/Acme/Reuniões",
+        "Hub note to link back to, e.g. Clients/Acme/_HUB": "Nota-hub para linkar, ex.: Clientes/Acme/_HUB",
+        "Index note that lists the meetings (a line is added)": "Nota de índice que lista as reuniões (uma linha é adicionada)",
         "Show only one client": "Mostrar só um cliente", "All clients": "Todos os clientes",
         "transcript": "transcrição",
         "Finishing the recording…": "Finalizando a gravação…",
@@ -807,16 +815,28 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         tv.set_size_request(420, 120)
         tv.get_buffer().set_text(self.cli("client", "show", client).stdout.strip())
         area.pack_start(tv, True, True, 0)
+        cfg = dict(ln.split("=", 1) for ln in self.cli("client", "config", client).stdout.splitlines() if "=" in ln)
+        area.pack_start(Gtk.Label(label=T("In your Obsidian vault (optional)"), xalign=0), False, False, 6)
+        fields = {}
+        for key, hint in (("folder", "Folder for this client's meetings, e.g. Clients/Acme/Meetings"),
+                          ("hub", "Hub note to link back to, e.g. Clients/Acme/_HUB"),
+                          ("index", "Index note that lists the meetings (a line is added)")):
+            e = Gtk.Entry(text=cfg.get(key, "")); e.set_placeholder_text(T(hint))
+            fields[key] = e
+            area.pack_start(e, False, False, 0)
         d.show_all()
         resp = d.run()
         b = tv.get_buffer()
         text = b.get_text(b.get_start_iter(), b.get_end_iter(), False).strip()
+        obs_vals = {k: e.get_text().strip() for k, e in fields.items()}
         d.destroy()
         if resp == Gtk.ResponseType.OK:
             if text:
                 self.cli("client", "set", client, text)
-            else:
+            elif not any(v for v in obs_vals.values()):
                 self.cli("client", "rm", client)
+            for key, val in obs_vals.items():
+                self.cli("client", "config", client, key, val)
             self.refresh_clients()
             self.client_box.get_child().set_text(client)
 
@@ -1458,8 +1478,43 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             item = Gtk.MenuItem(label=T(label))
             item.connect("activate", lambda _i, e=ext: self.on_export(e))
             menu.append(item)
+        menu.append(Gtk.SeparatorMenuItem())
+        obs = Gtk.MenuItem(label=T("Obsidian note"))
+        obs.connect("activate", lambda *_: self.on_obsidian())
+        menu.append(obs)
+        pick = Gtk.MenuItem(label=T("Choose the Obsidian vault…"))
+        pick.connect("activate", lambda *_: self.pick_vault())
+        menu.append(pick)
         menu.show_all()
         menu.popup_at_widget(self.action_btns[4], Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
+
+    def pick_vault(self):
+        d = Gtk.FileChooserDialog(title=T("Choose the Obsidian vault"), transient_for=self,
+                                  action=Gtk.FileChooserAction.SELECT_FOLDER)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Select"), Gtk.ResponseType.OK)
+        resp = d.run(); path = d.get_filename(); d.destroy()
+        if resp != Gtk.ResponseType.OK or not path:
+            return False
+        r = self.cli("config", "obsidian_vault", path)
+        if r.returncode != 0:
+            self.error_dialog(T("Could not save the settings"), r.stderr or r.stdout)
+            return False
+        return True
+
+    def on_obsidian(self):
+        """Save the open meeting as a note in the Obsidian vault (asks for the vault the first time)."""
+        if not self.selected:
+            return
+        if not self._cfg("obsidian_vault", "") and not self.pick_vault():
+            return
+        name = self.selected.stem
+        r = self.cli("obsidian", name)
+        if r.returncode != 0:
+            self.error_dialog(T("Could not export to Obsidian"), (r.stderr or r.stdout)[-600:])
+            return
+        lines = r.stdout.strip().splitlines()
+        self.notify(T("Saved in Obsidian"), Path(lines[0]).name if lines else "")
 
     def on_export(self, ext):
         if not self.selected:

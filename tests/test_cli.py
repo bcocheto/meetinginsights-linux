@@ -71,6 +71,22 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli("search", "--client", "outro", "entrada").returncode, 1)
         self.assertEqual(self.run_cli("search", "inexistente").returncode, 1)
 
+    def test_obsidian_export_through_the_cli(self):
+        name = "2026-11-10_11-00_ata"
+        (self.out / f"{name}.md").write_text("# Ata\n\n- **Resumo.**\n")
+        vault = Path(self.tmp.name) / "vault"; vault.mkdir()
+        self.assertNotEqual(self.run_cli("obsidian", name).returncode, 0)            # no vault yet
+        self.assertEqual(self.run_cli("config", "obsidian_vault", str(vault)).returncode, 0)
+        self.assertNotEqual(self.run_cli("config", "obsidian_vault", str(vault / "nope")).returncode, 0)
+        self.assertNotEqual(self.run_cli("config", "obsidian_folder", "/etc").returncode, 0)
+        r = self.run_cli("obsidian", name)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((vault / "Meetings" / "2026-11-10 - Ata.md").exists())
+        self.assertNotEqual(self.run_cli("obsidian", name, "--folder", "../x").returncode, 0)
+        self.run_cli("client", "config", "Acme", "folder", "Clients/Acme")
+        self.assertEqual(self.run_cli("client", "config", "Acme").stdout.strip(), "folder=Clients/Acme")
+        self.assertNotEqual(self.run_cli("client", "config", "Acme", "folder", "/abs").returncode, 0)
+
     def test_finish_needs_a_queued_recording(self):
         r = self.run_cli("finish", "2026-11-10_11-00_nada")
         self.assertNotEqual(r.returncode, 0)
@@ -79,7 +95,7 @@ class Cli(unittest.TestCase):
 
     def test_help_mentions_the_new_commands(self):
         out = self.run_cli("help").stdout
-        for word in ("--focus", "client", "recover", "--capture-only"):
+        for word in ("--focus", "client", "recover", "--capture-only", "obsidian"):
             self.assertIn(word, out)
 
 
