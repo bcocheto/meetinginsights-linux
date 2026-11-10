@@ -180,6 +180,8 @@ minuta import ligacao.mp4 "Kickoff" --client "Acme"
 minuta notes <transcricao.txt>    # gera a ata de novo a partir de uma transcrição
 minuta reprocess <nome> [--notes-only] [--client N] [--focus T]
 minuta rename <nome> "Novo título"
+minuta speakers <nome>                       # lista os falantes
+minuta speakers <nome> "Speaker 2=Maria"     # renomeia na transcrição e na ata
 minuta export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
 minuta delete <nome>
 minuta obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian

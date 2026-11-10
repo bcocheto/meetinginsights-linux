@@ -177,6 +177,8 @@ minuta import call.mp4 "Kickoff" --client "Acme"
 minuta notes <transcript.txt>     # regenerate notes from a transcript
 minuta reprocess <name> [--notes-only] [--client N] [--focus T]
 minuta rename <name> "New title"
+minuta speakers <name>                       # list the speakers
+minuta speakers <name> "Speaker 2=Maria"     # rename them in the transcript and the notes
 minuta export <name> <md|docx|pdf> [file] [--no-transcript]
 minuta delete <name>
 minuta obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault

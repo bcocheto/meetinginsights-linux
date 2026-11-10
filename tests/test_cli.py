@@ -61,6 +61,16 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli("delete", "2026-11-10_11-00_depois").returncode, 0)
         self.assertFalse((rec / "2026-11-10_11-00_depois.meta").exists())
 
+    def test_speakers_list_and_rename(self):
+        name = "2026-11-10_11-00_ata"
+        (self.home / "rec" / f"{name}.txt").write_text("[00:01] Speaker 1: oi\n[00:05] You: ola\n")
+        (self.out / f"{name}.md").write_text("# Ata\n\n- Speaker 1 abriu.\n")
+        self.assertEqual(self.run_cli("speakers", name).stdout.splitlines(), ["Speaker 1\t1", "You\t1"])
+        self.assertEqual(self.run_cli("speakers", name, "Speaker 1=Ana").returncode, 0)
+        self.assertIn("Ana abriu", (self.out / f"{name}.md").read_text())
+        self.assertIn("[00:01] Ana: oi", (self.home / "rec" / f"{name}.txt").read_text())
+        self.assertNotEqual(self.run_cli("speakers", name, "Ninguem=Z").returncode, 0)
+
     def test_search_command(self):
         (self.out / "2026-11-10_11-00_a.md").write_text("# Reunião A\n\n- Preço de entrada: 8%.\n")
         (self.home / "rec" / "2026-11-10_11-00_a.meta").write_text("client=Acme\n")

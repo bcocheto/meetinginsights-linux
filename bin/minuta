@@ -18,6 +18,7 @@
 #   minuta import <audio|video> [title] [--client N] [--focus T]   transcribe an existing file and write the notes
 #   minuta reprocess <name> [--notes-only] [--client N] [--focus T]    transcribe again and rewrite the notes
 #   minuta rename <name> <new title>          rename a meeting
+#   minuta speakers <name> ["Old=New" ...]     list the speakers, or rename them in the transcript and the notes
 #   minuta export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
 #   minuta delete <name>                      delete a meeting's notes, transcript and audio
 #
@@ -742,6 +743,16 @@ cmd_rename() {
     echo "Renamed to: $newname"
 }
 
+cmd_speakers() {
+    local name="${1:-}"; shift || true
+    _valid_name "$name"
+    local base="$DATA_DIR/rec/$name"
+    [[ -s "$base.txt" ]] || die "no transcript for $name"
+    if (( $# == 0 )); then python3 -I "$PREFIX/lib/speakers.py" list "$base.txt"; return; fi
+    local notes="-"; [[ -f "$OUT_DIR/$name.md" ]] && notes="$OUT_DIR/$name.md"
+    python3 -I "$PREFIX/lib/speakers.py" rename "$base.txt" "$notes" "$@"
+}
+
 cmd_import() {
     _parse_meta_flags "$@"
     local file="${POS[0]:-}" title="${POS[1]:-}"
@@ -867,6 +878,7 @@ case "${1:-}" in
     setup)  shift; cmd_setup "$@" ;;
     reprocess) shift; cmd_reprocess "$@" ;;
     rename) shift; cmd_rename "$@" ;;
+    speakers) shift; cmd_speakers "$@" ;;
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;

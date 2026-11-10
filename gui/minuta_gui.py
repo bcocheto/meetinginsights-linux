@@ -222,6 +222,12 @@ STRINGS = {
         "Rewrite notes": "Refazer a ata",
         "Transcribe again": "Transcrever de novo",
         "Edit transcript": "Editar transcrição",
+        "Speakers": "Falantes",
+        "Rename speakers": "Renomear falantes",
+        "Type the real name next to each speaker; leave it empty to keep it. Two speakers with the same name are merged.": "Digite o nome real ao lado de cada falante; deixe vazio para manter. Dois falantes com o mesmo nome são unidos.",
+        "lines": "falas",
+        "Could not rename the speakers": "Não foi possível renomear os falantes",
+        "Speakers renamed": "Falantes renomeados",
         "Delete": "Excluir",
         "Cancel": "Cancelar",
         "Rename meeting": "Renomear reunião",
@@ -1470,6 +1476,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
             ("Rewrite notes", "Rewrites the notes from the current transcript (use after editing it)", self.on_rewrite),
             ("Transcribe again", "Transcribes the audio again with the current language and model", self.on_retranscribe),
             ("Edit transcript", None, self.on_edit_transcript),
+            ("Speakers", "Rename Speaker 1, Speaker 2… to the real names, in the transcript and the notes", self.on_speakers),
             ("Export", None, self.on_export_menu),
             ("Delete", None, self.on_delete),
         ]
@@ -1554,6 +1561,53 @@ class MinutaWindow(Gtk.ApplicationWindow):
         except OSError as e:
             self.error_dialog(T("Could not open the transcript"), str(e))
 
+    def on_speakers(self):
+        if not self.selected:
+            return
+        name = self.selected.stem
+        r = self.cli("speakers", name)
+        rows = [ln.split("\t") for ln in r.stdout.splitlines() if "\t" in ln]
+        if r.returncode != 0 or not rows:
+            self.error_dialog(T("Could not rename the speakers"), (r.stderr or r.stdout)[-400:])
+            return
+        d = Gtk.Dialog(title=T("Rename speakers"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Rename"), Gtk.ResponseType.OK)
+        d.set_default_response(Gtk.ResponseType.OK)
+        box = d.get_content_area(); box.set_spacing(8)
+        for m in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(box.props, m, 14)
+        hint = Gtk.Label(label=T("Type the real name next to each speaker; leave it empty to keep it. "
+                                 "Two speakers with the same name are merged."), xalign=0, wrap=True)
+        hint.set_max_width_chars(48); hint.get_style_context().add_class("dim-label")
+        box.pack_start(hint, False, False, 0)
+        grid = Gtk.Grid(column_spacing=12, row_spacing=8)
+        entries = []
+        for i, (who, n) in enumerate(rows):
+            lbl = Gtk.Label(label=f"{who}  ·  {n} {T('lines')}", xalign=0)
+            e = Gtk.Entry(placeholder_text=who, activates_default=True); e.set_width_chars(22)
+            grid.attach(lbl, 0, i, 1, 1); grid.attach(e, 1, i, 1, 1)
+            entries.append((who, e))
+        box.pack_start(grid, False, False, 0)
+        d.show_all()
+        resp = d.run()
+        pairs = [f"{who}={e.get_text().strip()}" for who, e in entries if e.get_text().strip()]
+        d.destroy()
+        if resp != Gtk.ResponseType.OK or not pairs:
+            return
+        r = self.cli("speakers", name, *pairs)
+        if r.returncode != 0:
+            self.error_dialog(T("Could not rename the speakers"), (r.stderr or r.stdout)[-400:])
+            return
+        self.notify(T("Speakers renamed"), "")
+        self.selected = None
+        self.load_meetings()
+        for row in self.listbox.get_children():
+            if getattr(row, "path", None) and row.path.stem == name:
+                self.listbox.select_row(row)
+                break
+        self._refresh_actions()
+
     def on_export_menu(self):
         if not self.selected:
             return
@@ -1577,7 +1631,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
         trl.connect("activate", lambda *_: self.trello_pick_list())
         menu.append(trl)
         menu.show_all()
-        menu.popup_at_widget(self.action_btns[4], Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
+        menu.popup_at_widget(self.action_btns[5], Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
 
     def pick_vault(self):
         d = Gtk.FileChooserDialog(title=T("Choose the Obsidian vault"), transient_for=self,
