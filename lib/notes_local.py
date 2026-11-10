@@ -110,11 +110,19 @@ def chunk(turns, max_chars=500):
 
 QUESTION_RE = re.compile(r"\?\s*$")
 COMMIT_RE = re.compile(
-    r"\b(i will|i\'ll|i am going to|i\'m going to|i can|let me|i shall)\b", re.I)
-REQUEST_RE = re.compile(r"\b(can you|could you|please|would you|can we|make sure)\b", re.I)
+    r"\b(i will|i\'ll|i am going to|i\'m going to|i can|let me|i shall|"
+    r"eu vou|vou (?:enviar|mandar|fazer|ver|checar|verificar|ajustar|preparar|marcar)|"
+    r"preciso (?:enviar|mandar|fazer|ver|checar|verificar|ajustar|preparar|marcar)|"
+    r"deixa comigo|fico de|eu envio|eu mando|eu faço|eu ajusto)\b", re.I)
+REQUEST_RE = re.compile(
+    r"\b(can you|could you|please|would you|can we|make sure|"
+    r"você pode|voce pode|pode (?:me )?(?:enviar|mandar|fazer|ver|checar|verificar|ajustar)|"
+    r"poderia|consegue|por favor|certifique-se)\b", re.I)
 DECISION_RE = re.compile(
     r"\b(let us|let\'s|we should|agreed|we will go with|decided|hold off|"
-    r"we are going to|going with|sign off|approved)\b", re.I)
+    r"we are going to|going with|sign off|approved|"
+    r"vamos (?:com|de|fechar|adotar|seguir|manter|usar)|combinado|fechado|decidimos|"
+    r"ficou definido|a gente vai|aprovado|combinamos)\b", re.I)
 FILLER_RE = re.compile(
     r"^(hi|hello|morning|good morning|thanks|thank you|ok|okay|right|good|yes|no)\b[\s,.!]*$",
     re.I)
