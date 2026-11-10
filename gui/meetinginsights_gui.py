@@ -104,6 +104,8 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Show only one client": "Mostrar só um cliente", "All clients": "Todos os clientes",
+        "transcript": "transcrição",
         "Finishing the recording…": "Finalizando a gravação…",
         "Processing: {name}": "Processando: {name}", "Waiting to process": "Aguardando para processar",
         "{n} waiting": "{n} na fila", "Unfinished recording": "Gravação não concluída",
@@ -224,6 +226,7 @@ for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/me
     if (_lib / "levels.py").exists():
         sys.path.insert(0, str(_lib)); break
 import levels  # noqa: E402
+import search as msearch  # noqa: E402
 
 DATA_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights"))
 LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "meetinginsights" / "language"
@@ -617,12 +620,19 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         recents.get_style_context().add_class("section-label")
         side.pack_start(recents, False, False, 0)
         self.search = Gtk.SearchEntry(placeholder_text=T("Search meetings…"))
-        self.search.connect("search-changed", lambda *_: self.listbox.invalidate_filter())
+        self.search.connect("search-changed", lambda *_: self._apply_search())
         side.pack_start(self.search, False, False, 0)
+        self.client_filter = Gtk.ComboBoxText()
+        self.client_filter.set_tooltip_text(T("Show only one client"))
+        self.client_filter.connect("changed", lambda *_: self._apply_search())
+        self.client_filter.set_no_show_all(True)
+        side.pack_start(self.client_filter, False, False, 0)
         sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
         self.listbox = Gtk.ListBox()
         self.listbox.connect("row-selected", self.on_select)
         self.listbox.set_filter_func(self._filter_row)
+        self.listbox.set_sort_func(self._sort_rows)
+        self._hits, self._meetings, self._query, self._client = {}, [], "", ""
         sw.add(self.listbox)
         side.pack_start(sw, True, True, 0)
         self.queue_box = Gtk.Box(spacing=8)
@@ -1184,6 +1194,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
 
     # ---------- meetings ----------
     def load_meetings(self):
+        self._meetings = msearch.load(NOTES_DIR, REC_DIR)
+        self._refresh_clients()
         for child in self.listbox.get_children():
             self.listbox.remove(child)
         files = sorted(NOTES_DIR.glob("*.md"), reverse=True) if NOTES_DIR.exists() else []
@@ -1198,6 +1210,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         for f in files:
             self.listbox.add(self._meeting_row(f))
         self.listbox.show_all()
+        self._apply_search()
 
     def _show_provider(self, provider):
         ctx = self.provider_lbl.get_style_context()
@@ -1214,16 +1227,52 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             self.provider_lbl.set_text("●  " + T("Written on this computer"))
             self.provider_lbl.set_tooltip_text(T("Nothing left this computer."))
 
+    def _apply_search(self):
+        """Search notes and transcripts of every meeting, optionally within one client."""
+        self._query = self.search.get_text().strip()
+        self._client = self.client_filter.get_active_id() or ""
+        self._hits = {h.meeting.name: h for h in msearch.search(self._meetings, self._query, self._client)}
+        for row in self.listbox.get_children():
+            path = getattr(row, "path", None)
+            if path is None:
+                continue
+            hit = self._hits.get(path.stem)
+            snip = getattr(row, "snip", None)
+            if snip is not None:
+                text = ""
+                if self._query and hit and hit.snippet:
+                    text = (T("transcript") + ": " if hit.where.startswith("transcript") else "") + hit.snippet
+                snip.set_text(text.strip()); snip.set_visible(bool(text.strip()))
+        self.listbox.invalidate_filter(); self.listbox.invalidate_sort()
+
     def _filter_row(self, row):
-        q = self.search.get_text().strip().lower()
-        if not q or not hasattr(row, "path"):
+        path = getattr(row, "path", None)
+        if path is None:
             return True
-        if q in row.path.stem.lower().replace("-", " ").replace("_", " "):
+        if not self._query and not self._client:
             return True
-        try:
-            return q in row.path.read_text().lower()
-        except OSError:
-            return False
+        return path.stem in self._hits
+
+    def _sort_rows(self, a, b):
+        pa, pb = getattr(a, "path", None), getattr(b, "path", None)
+        if pa is None or pb is None:
+            return 0
+        if self._query:
+            sa = self._hits.get(pa.stem); sb = self._hits.get(pb.stem)
+            ka, kb = (sa.score if sa else 0), (sb.score if sb else 0)
+            if ka != kb:
+                return -1 if ka > kb else 1
+        return -1 if pa.stem > pb.stem else (1 if pa.stem < pb.stem else 0)
+
+    def _refresh_clients(self):
+        names = msearch.clients(self._meetings)
+        current = self.client_filter.get_active_id() or ""
+        self.client_filter.remove_all()
+        self.client_filter.append("", T("All clients"))
+        for n in names:
+            self.client_filter.append(n, n)
+        self.client_filter.set_active_id(current if current in names else "")
+        self.client_filter.set_visible(bool(names))
 
     def _meeting_row(self, path: Path):
         stem = path.stem
@@ -1250,6 +1299,9 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             prov = ""
         if prov:
             meta += "  ·  ☁ " + PROVIDER_NAMES.get(prov, prov)
+        client = next((m.client for m in self._meetings if m.name == stem), "")
+        if client:
+            meta += "  ·  " + client
         row = Gtk.ListBoxRow()
         row.path = path
         outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -1268,6 +1320,11 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         d = Gtk.Label(label=meta, xalign=0)
         d.get_style_context().add_class("row-meta")
         box.pack_start(t, False, False, 0); box.pack_start(d, False, False, 0)
+        row.snip = Gtk.Label(label="", xalign=0)
+        row.snip.get_style_context().add_class("row-meta")
+        row.snip.set_ellipsize(Pango.EllipsizeMode.END); row.snip.set_max_width_chars(34)
+        row.snip.set_no_show_all(True); row.snip.hide()
+        box.pack_start(row.snip, False, False, 0)
         row.add(outer)
         return row
 
@@ -1293,6 +1350,11 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         if transcript.exists():
             html_doc += f"<h2>{T('Transcript')}</h2>" + transcript_html(transcript.read_text())
         self.webview.load_html(html_doc, None)
+        words = msearch.terms(self._query) if getattr(self, "_query", "") else []
+        if words:
+            fc = self.webview.get_find_controller()
+            GLib.timeout_add(400, lambda: (fc.search(words[0], WebKit2.FindOptions.CASE_INSENSITIVE
+                                                     | WebKit2.FindOptions.WRAP_AROUND, 50), False)[1])
 
     def _build_actions(self):
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)

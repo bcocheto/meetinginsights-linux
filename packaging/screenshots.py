@@ -88,6 +88,8 @@ def write(m, live=False):
     L += [f"| {o} | {t} | {i * 4 + 6:02d}:{12 + i * 9:02d} |" for i, (o, t) in enumerate(actions)] if actions else ["_None identified._"]
     L += ["", "## Decisions\n"] + ([f"- **{o}** (08:41): {t}" for o, t in decisions] or ["_None recorded._"]) + [""]
     L += ["## Open Questions\n"] + ([f"- **{o}** (21:05): {t}" for o, t in questions] or ["_None raised._"]) + [""]
+    if client or focus:
+        (REC / f"{base}.meta").write_text((f"client={client}\n" if client else "") + (f"focus={focus}\n" if focus else ""))
     (NOTES / f"{base}.md").write_text("\n".join(L) + "\n")
     (REC / f"{base}.txt").write_text("\n".join(f"[{i * 3:02d}:{(i * 17) % 60:02d}] {s}: {t}" for i, (s, t) in enumerate(turns)) + "\n")
     # newest first in the list: the file stem sorts by date, nothing else to do
@@ -159,6 +161,10 @@ win.set_mode("recording"); win._update_stage(); win._live_text = None
 win.show_live(); win._levels_tick(); shot("recording")
 (TMP / "recording").unlink(); (HOME / "current").unlink()
 win.mode = "idle"; win.set_mode("idle")
+
+# searching every meeting by what was said
+win.search.set_text("surcharge"); pump(0.5); win.listbox.select_row(next(r for r in win.listbox.get_children() if getattr(r, "path", None) and r.get_mapped() and r.get_child_visible())); shot("search")
+win.search.set_text("")
 
 # the background queue (a slow fake job keeps it on screen)
 win.submit_job("Pricing workshop", ("slow",), lambda r: None)

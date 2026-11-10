@@ -61,6 +61,16 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli("delete", "2026-11-10_11-00_depois").returncode, 0)
         self.assertFalse((rec / "2026-11-10_11-00_depois.meta").exists())
 
+    def test_search_command(self):
+        (self.out / "2026-11-10_11-00_a.md").write_text("# Reunião A\n\n- Preço de entrada: 8%.\n")
+        (self.home / "rec" / "2026-11-10_11-00_a.meta").write_text("client=Acme\n")
+        r = self.run_cli("search", "preco")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("Reunião A", r.stdout); self.assertIn("[Acme]", r.stdout)
+        self.assertEqual(self.run_cli("search", "--client", "acme", "entrada").returncode, 0)
+        self.assertEqual(self.run_cli("search", "--client", "outro", "entrada").returncode, 1)
+        self.assertEqual(self.run_cli("search", "inexistente").returncode, 1)
+
     def test_finish_needs_a_queued_recording(self):
         r = self.run_cli("finish", "2026-11-10_11-00_nada")
         self.assertNotEqual(r.returncode, 0)

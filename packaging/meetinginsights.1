@@ -41,6 +41,10 @@ Finish a recording that was cut short and process audio left without minutes.
 .BI "import " file " [title]"
 Transcribe an existing audio or video file and write the minutes.
 .TP
+.BI "search [--client " name "] " words
+Find meetings by what was said, in the minutes and the transcripts. Ignores case
+and accents; every word must match, and a quoted phrase must match as written.
+.TP
 .BI "client [list|show|set|rm] " name " [terms]"
 Keep a glossary of names and terms for a client.
 .TP

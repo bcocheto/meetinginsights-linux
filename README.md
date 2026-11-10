@@ -38,6 +38,7 @@ possible, but it is off unless you turn it on.
 | 📝 **Useful notes** | Summary with an overview, action items with owners, decisions, open questions. Portuguese and English. |
 | 🎯 **Client and focus** | A saved **glossary** of names and terms per client, and a **focus** ("what matters in this meeting") that gets its own *In focus* section. |
 | 🔊 **Input meters** | Live levels for the microphone and the call audio, with a warning when one of them goes quiet — a dead input is caught in seconds, not after the meeting. |
+| 🔎 **Search everything** | Find a meeting by what was said — in the notes *and* the transcript, ignoring case and accents — and filter by client. Matches are highlighted in the notes. |
 | 🛟 **Crash recovery** | A recording cut short (crash, power loss) is finished on the next launch, and audio that never got notes is offered for processing. |
 | 📤 **Export and edit** | Rename, rewrite the notes, transcribe again, edit the transcript, delete; export to Markdown, Word (`.docx`) or PDF. |
 | 🧠 **Your choice of writer** | A small local model, a bigger local one, or — opt in — Claude Code / Gemini CLI. |
@@ -46,6 +47,10 @@ possible, but it is off unless you turn it on.
 <tr>
 <td width="50%"><img src="docs/screenshots/new-meeting.png" alt="New meeting: title, client, focus"><br><sub><b>New meeting</b> — a title, an optional client (with its glossary) and a focus.</sub></td>
 <td width="50%"><img src="docs/screenshots/recording.png" alt="Recording with input meters and live transcript"><br><sub><b>Recording</b> — input meters and a live transcript.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/search.png" alt="Searching every meeting"><br><sub><b>Search</b> — across notes and transcripts, with a client filter.</sub></td>
+<td width="50%"><img src="docs/screenshots/queue.png" alt="Notes view with the processing queue in the sidebar"><br><sub><b>Background queue</b> — the next recording can start while this one is processed.</sub></td>
 </tr>
 </table>
 
@@ -155,6 +160,7 @@ meetinginsights reprocess <name> [--notes-only] [--client N] [--focus T]
 meetinginsights rename <name> "New title"
 meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]
 meetinginsights delete <name>
+meetinginsights search [--client N] words  # find meetings by what was said
 meetinginsights recover [--list]           # finish an interrupted recording
 ```
 
@@ -239,7 +245,7 @@ Environment variables override the settings file (`~/.config/meetinginsights/con
 python3 -m unittest discover -s tests
 ```
 
-Covers note classification, focus matching, the external writer, input levels, the CLI
+Covers note classification, focus matching, search, the external writer, input levels, the CLI
 (glossaries, interrupted recordings, renames) and word error rate. To guard transcription
 quality when you change the pipeline, point the end-to-end test at a recording and its
 reference text:

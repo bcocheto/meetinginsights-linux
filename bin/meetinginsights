@@ -7,6 +7,7 @@
 #   meetinginsights stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
 #                                             recording; finish later with: meetinginsights finish <name>)
 #   meetinginsights status                    show whether a recording is running
+#   meetinginsights search [--client NAME] words   find meetings by what was said, in notes and transcripts
 #   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
@@ -623,6 +624,11 @@ cmd_config() {
     echo "$key=$val"
 }
 
+cmd_search() { # search [--client NAME] words...   (a quoted phrase must match as written)
+    [[ $# -gt 0 ]] || die "usage: meetinginsights search [--client NAME] <words...>"
+    "$(command -v python3)" "$PREFIX/lib/search.py" "$OUT_DIR" "$DATA_DIR/rec" "$@"
+}
+
 cmd_providers() { # prints the external note writers that are installed
     "${PY:-python3}" - "$PREFIX/lib" <<'PYEOF'
 import sys
@@ -774,11 +780,12 @@ case "${1:-}" in
     delete) shift; cmd_delete "$@" ;;
     finish) shift; cmd_finish "$@" ;;
     recover) shift; cmd_recover "$@" ;;
+    search) shift; cmd_search "$@" ;;
     client) shift; cmd_client "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,27p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,28p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac
