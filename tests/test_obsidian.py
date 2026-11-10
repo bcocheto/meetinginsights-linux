@@ -41,7 +41,7 @@ class Export(unittest.TestCase):
         text = path.read_text()
         self.assertTrue(text.startswith("---\ntype: reuniao\n"))
         for needle in ('cliente: "Leonardo Barreto"', "participantes: [Breno, Leonardo]", "duration_min: 11",
-                       "tags: [reuniao, meetinginsights, leonardo-barreto]", f"meeting: {NAME}",
+                       "tags: [reuniao, minuta, leonardo-barreto]", f"meeting: {NAME}",
                        "> [!note]- Transcrição", "> [00:05] Você: Bom dia."):
             self.assertIn(needle, text)
 

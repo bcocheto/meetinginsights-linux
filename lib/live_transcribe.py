@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 
-_lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
+_lang = os.environ.get("MINUTA_LANGUAGE", "pt")
 LANGUAGE = None if _lang == "auto" else _lang
 
 
@@ -39,9 +39,9 @@ def load_model(size, **kw):
 
 HEADER = 44                      # canonical PCM wav header parec writes
 RATE = 16000
-WINDOW_S = float(os.environ.get("MEETINGINSIGHTS_LIVE_WINDOW", "45"))
+WINDOW_S = float(os.environ.get("MINUTA_LIVE_WINDOW", "45"))
 OVERLAP_S = 1.5
-THREADS = int(os.environ.get("MEETINGINSIGHTS_THREADS") or os.environ.get("MEETINGINSIGHTS_LIVE_THREADS", "3"))
+THREADS = int(os.environ.get("MINUTA_THREADS") or os.environ.get("MINUTA_LIVE_THREADS", "3"))
 MIN_S = 8.0                      # do not bother the model with scraps
 
 

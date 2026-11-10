@@ -1,13 +1,13 @@
 #!/bin/bash
-# Install MeetingInsights into ~/.local (no root required).
+# Install Minuta into ~/.local (no root required).
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX="${PREFIX:-$HOME/.local}"
-SHARE="$PREFIX/share/meetinginsights"
-DATA="$HOME/.local/share/meetinginsights"
+SHARE="$PREFIX/share/minuta"
+DATA="$HOME/.local/share/minuta"
 
-echo "Installing MeetingInsights to $PREFIX"
+echo "Installing Minuta to $PREFIX"
 
 missing=()
 for c in parec ffmpeg ffprobe python3; do command -v "$c" >/dev/null || missing+=("$c"); done
@@ -19,37 +19,44 @@ if ((${#missing[@]})); then
     exit 1
 fi
 
+# the app used to be called MeetingInsights: remove the old program files (your data is moved on first run)
+rm -rf "$PREFIX/share/meetinginsights"
+rm -f "$PREFIX/bin/meetinginsights" "$PREFIX/bin/meetinginsights-gui" \
+      "$PREFIX/share/applications/page.saurabh.MeetingInsights.desktop" "$PREFIX/share/applications/meetinginsights.desktop"
+find "$PREFIX/share/icons/hicolor" -name 'meetinginsights.png' -delete 2>/dev/null || true
+
 mkdir -p "$SHARE" "$PREFIX/bin" "$PREFIX/share/applications" "$DATA/models"
 cp -r "$SRC/lib" "$SRC/gui" "$SHARE/"
-install -m755 "$SRC/bin/meetinginsights" "$PREFIX/bin/meetinginsights"
+find "$SHARE" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+install -m755 "$SRC/bin/minuta" "$PREFIX/bin/minuta"
 
-cat > "$PREFIX/bin/meetinginsights-gui" <<GUI
+cat > "$PREFIX/bin/minuta-gui" <<GUI
 #!/bin/bash
-exec python3 "$SHARE/gui/meetinginsights_gui.py" "\$@"
+exec python3 "$SHARE/gui/minuta_gui.py" "\$@"
 GUI
-chmod +x "$PREFIX/bin/meetinginsights-gui"
+chmod +x "$PREFIX/bin/minuta-gui"
 
 for sz in 16 22 24 32 48 64 128 256 512; do
     d="$PREFIX/share/icons/hicolor/${sz}x${sz}/apps"
     mkdir -p "$d"
-    install -m644 "$SRC/icons/${sz}x${sz}/meetinginsights.png" "$d/meetinginsights.png" 2>/dev/null || true
+    install -m644 "$SRC/icons/${sz}x${sz}/minuta.png" "$d/minuta.png" 2>/dev/null || true
 done
 gtk-update-icon-cache -f -t "$PREFIX/share/icons/hicolor" 2>/dev/null || true
 
 # The file name must equal the GTK application id, or Wayland shows a generic dock icon.
-rm -f "$PREFIX/share/applications/meetinginsights.desktop"
-sed "s|^Exec=.*|Exec=$PREFIX/bin/meetinginsights-gui|" "$SRC/page.saurabh.MeetingInsights.desktop" \
-    > "$PREFIX/share/applications/page.saurabh.MeetingInsights.desktop"
+rm -f "$PREFIX/share/applications/minuta.desktop"
+sed "s|^Exec=.*|Exec=$PREFIX/bin/minuta-gui|" "$SRC/io.github.bcocheto.Minuta.desktop" \
+    > "$PREFIX/share/applications/io.github.bcocheto.Minuta.desktop"
 update-desktop-database "$PREFIX/share/applications" 2>/dev/null || true
 
 if [[ ! -x "$DATA/venv/bin/python" ]]; then
     echo "Creating the Python environment (this takes a minute)..."
     python3 -m venv "$DATA/venv"
-    "$DATA/venv/bin/pip" install -q --upgrade pip
-    "$DATA/venv/bin/pip" install -q faster-whisper python-docx reportlab sherpa-onnx
+    "$DATA/venv/bin/python" -m pip install -q --upgrade pip
+    "$DATA/venv/bin/python" -m pip install -q faster-whisper python-docx reportlab sherpa-onnx
     # NVIDIA GPU present: CUDA libraries inside this environment only, for faster transcription
     if command -v nvidia-smi >/dev/null 2>&1; then
-        "$DATA/venv/bin/pip" install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 || true
+        "$DATA/venv/bin/python" -m pip install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 || true
     fi
 fi
 
@@ -65,7 +72,7 @@ fi
 
 echo
 echo "Installed. Next:"
-echo "  meetinginsights setup     # download the models (~1.5 GB, one time)"
-echo "  meetinginsights start \"My meeting\""
+echo "  minuta setup     # download the models (~1.5 GB, one time)"
+echo "  minuta start \"My meeting\""
 echo
 case ":$PATH:" in *":$PREFIX/bin:"*) ;; *) echo "Note: add $PREFIX/bin to your PATH." ;; esac

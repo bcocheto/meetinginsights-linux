@@ -30,7 +30,7 @@ def _preload_cuda() -> bool:
 
 
 def cuda_available() -> bool:
-    if os.environ.get("MEETINGINSIGHTS_DEVICE", "auto") == "cpu":
+    if os.environ.get("MINUTA_DEVICE", "auto") == "cpu":
         return False
     try:
         import ctranslate2
@@ -66,12 +66,12 @@ def options(live: bool = False) -> dict:
     """Decoding options from the user's settings (environment variables set by the CLI)."""
     env = os.environ.get
     opts = {}
-    prompt = (env("MEETINGINSIGHTS_PROMPT") or "").strip()
+    prompt = (env("MINUTA_PROMPT") or "").strip()
     if prompt:
         opts["initial_prompt"] = prompt[:500]
     if not live:
         try:
-            opts["beam_size"] = max(1, min(10, int(env("MEETINGINSIGHTS_BEAM", "5"))))
+            opts["beam_size"] = max(1, min(10, int(env("MINUTA_BEAM", "5"))))
         except ValueError:
             opts["beam_size"] = 5
     return opts
@@ -79,7 +79,7 @@ def options(live: bool = False) -> dict:
 
 def prepare(samples):
     """Optionally even out the volume so quiet voices are not missed."""
-    if os.environ.get("MEETINGINSIGHTS_NORMALIZE", "off") != "on" or not len(samples):
+    if os.environ.get("MINUTA_NORMALIZE", "off") != "on" or not len(samples):
         return samples
     import numpy as np
     peak = float(np.abs(samples).max())

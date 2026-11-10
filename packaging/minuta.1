@@ -1,8 +1,8 @@
-.TH MEETINGINSIGHTS 1 "2026" "meetinginsights 0.7.0" "User Commands"
+.TH MEETINGINSIGHTS 1 "2026" "minuta 0.7.0" "User Commands"
 .SH NAME
-meetinginsights \- record meetings and write minutes, entirely on device
+minuta \- record meetings and write minutes, entirely on device
 .SH SYNOPSIS
-.B meetinginsights
+.B minuta
 .I command
 .RI [ arguments ]
 .SH DESCRIPTION
@@ -86,26 +86,26 @@ still needs to be run. Intended for scripts and the desktop app.
 Regenerate minutes from an existing transcript file.
 .SH ENVIRONMENT
 .TP
-.B MEETINGINSIGHTS_OUT
+.B MINUTA_OUT
 Directory for the written minutes. Default ~/MeetingNotes.
 .TP
-.B MEETINGINSIGHTS_WHISPER_MODEL
+.B MINUTA_WHISPER_MODEL
 faster-whisper model name (small, medium, large-v3-turbo). Default: large-v3-turbo when the GPU libraries are installed, else small.
 .TP
-.B MEETINGINSIGHTS_LLM_MODEL
+.B MINUTA_LLM_MODEL
 Path to a GGUF chat model used for the prose summaries.
 .TP
-.B MEETINGINSIGHTS_YOU ", " MEETINGINSIGHTS_THEM
+.B MINUTA_YOU ", " MINUTA_THEM
 Labels for the microphone and system-audio channels.
 .SH FILES
 .TP
 .I ~/MeetingNotes/
 Written minutes, one Markdown file per meeting.
 .TP
-.I ~/.local/share/meetinginsights/rec/
+.I ~/.local/share/minuta/rec/
 Recordings and transcripts.
 .SH NOTES
 Recording a conversation without informing the other participants is unlawful
 in many jurisdictions. Please obtain consent.
 .SH SEE ALSO
-Project page: https://github.com/bcocheto/meetinginsights-linux
+Project page: https://github.com/bcocheto/minuta

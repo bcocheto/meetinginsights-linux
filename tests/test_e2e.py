@@ -3,7 +3,7 @@
     MI_E2E_AUDIO=talk.wav MI_E2E_REFERENCE=talk.txt MI_E2E_MAX_WER=0.20 \
         python3 -m unittest tests.test_e2e
 
-Run it with the app's Python (~/.local/share/meetinginsights/venv/bin/python) so faster-whisper is available.
+Run it with the app's Python (~/.local/share/minuta/venv/bin/python) so faster-whisper is available.
 """
 import os
 import subprocess

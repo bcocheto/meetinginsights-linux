@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=MeetingInsights
+Name=Minuta
 GenericName=AI Note Taker
 Comment=Record meetings and write notes with on-device AI
-Exec=meetinginsights-gui
-Icon=meetinginsights
+Exec=minuta-gui
+Icon=minuta
 Terminal=false
 Categories=Office;AudioVideo;Recorder;
 Keywords=meeting;notes;minutes;transcribe;record;offline;ai;
 StartupNotify=true
-StartupWMClass=page.saurabh.MeetingInsights
+StartupWMClass=io.github.bcocheto.Minuta

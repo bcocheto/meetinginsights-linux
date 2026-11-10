@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-CLI = str(Path(__file__).resolve().parent.parent / "bin" / "meetinginsights")
+CLI = str(Path(__file__).resolve().parent.parent / "bin" / "minuta")
 
 
 class Cli(unittest.TestCase):
@@ -15,7 +15,7 @@ class Cli(unittest.TestCase):
         self.home, self.out = t / "home", t / "out"
         (self.home / "rec").mkdir(parents=True)
         self.out.mkdir()
-        self.env = {**os.environ, "MEETINGINSIGHTS_HOME": str(self.home), "MEETINGINSIGHTS_OUT": str(self.out),
+        self.env = {**os.environ, "MINUTA_HOME": str(self.home), "MINUTA_OUT": str(self.out),
                     "XDG_CONFIG_HOME": str(t / "cfg"), "LC_ALL": "C.UTF-8"}
 
     def tearDown(self):

@@ -88,12 +88,12 @@ class Base(unittest.TestCase):
         for d in (self.notes, self.rec):
             d.mkdir()
         (self.notes / f"{NAME}.md").write_text(NOTES_PT)
-        os.environ["MEETINGINSIGHTS_TRELLO_URL"] = self.url
-        for k in ("MEETINGINSIGHTS_TRELLO_KEY", "MEETINGINSIGHTS_TRELLO_TOKEN"):
+        os.environ["MINUTA_TRELLO_URL"] = self.url
+        for k in ("MINUTA_TRELLO_KEY", "MINUTA_TRELLO_TOKEN"):
             os.environ.pop(k, None)
 
     def tearDown(self):
-        os.environ.pop("MEETINGINSIGHTS_TRELLO_URL", None)
+        os.environ.pop("MINUTA_TRELLO_URL", None)
         self.tmp.cleanup()
 
 
@@ -186,18 +186,18 @@ class Api(Base):
 
 class Cli(Base):
     def run_cli(self, *args, stdin=None):
-        env = {**os.environ, "MEETINGINSIGHTS_HOME": str(Path(self.tmp.name) / "home"), "MEETINGINSIGHTS_OUT": str(self.notes),
+        env = {**os.environ, "MINUTA_HOME": str(Path(self.tmp.name) / "home"), "MINUTA_OUT": str(self.notes),
                "XDG_CONFIG_HOME": str(self.cfg.parent / "xdg")}
         (Path(self.tmp.name) / "home" / "rec").mkdir(parents=True, exist_ok=True)
-        env["MEETINGINSIGHTS_HOME"] = str(Path(self.tmp.name) / "home")
-        return subprocess.run([str(ROOT / "bin" / "meetinginsights"), *args], capture_output=True, text=True, env=env,
+        env["MINUTA_HOME"] = str(Path(self.tmp.name) / "home")
+        return subprocess.run([str(ROOT / "bin" / "minuta"), *args], capture_output=True, text=True, env=env,
                               input=stdin, timeout=60)
 
     def test_login_boards_use_and_send(self):
         r = self.run_cli("trello", "login", stdin=f"{KEY}\n{TOKEN}\n")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("Breno Teste", r.stdout)
-        cred = Path(self.tmp.name) / "xdg" / "meetinginsights" / "trello"
+        cred = Path(self.tmp.name) / "xdg" / "minuta" / "trello"
         self.assertEqual(stat.S_IMODE(cred.stat().st_mode), 0o600)
         self.assertIn("Ideias", self.run_cli("trello", "boards").stdout)
         self.assertEqual(self.run_cli("trello", "lists", "b" * 24).stdout.split("\t")[0], LIST_ID)

@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 
 LLAMA_DIR = Path(os.environ.get(
-    "MEETINGINSIGHTS_LLAMA_DIR", Path.home() / ".local/share/meetinginsights/llama"))
+    "MINUTA_LLAMA_DIR", Path.home() / ".local/share/minuta/llama"))
 LLAMA_BIN = LLAMA_DIR / "llama"
-THREADS = os.environ.get("MEETINGINSIGHTS_THREADS", "0")
+THREADS = os.environ.get("MINUTA_THREADS", "0")
 if not THREADS.isdigit() or int(THREADS) < 1:
     THREADS = str(min(os.cpu_count() or 4, 8))
 
@@ -232,12 +232,12 @@ def main() -> int:
         print("no turns parsed", file=sys.stderr)
         return 3
     speakers = sorted({t["speaker"] for t in turns})
-    focus = os.environ.get("MEETINGINSIGHTS_FOCUS", "").strip()
-    client = os.environ.get("MEETINGINSIGHTS_CLIENT", "").strip()
-    glossary = os.environ.get("MEETINGINSIGHTS_GLOSSARY", "").strip()
+    focus = os.environ.get("MINUTA_FOCUS", "").strip()
+    client = os.environ.get("MINUTA_CLIENT", "").strip()
+    glossary = os.environ.get("MINUTA_GLOSSARY", "").strip()
 
     summaries, buckets, used_external = [], None, ""
-    provider = os.environ.get("MEETINGINSIGHTS_NOTES_PROVIDER", "local")
+    provider = os.environ.get("MINUTA_NOTES_PROVIDER", "local")
     if provider != "local":
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import notes_external

@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 from faster_whisper import WhisperModel
 
-_lang = os.environ.get("MEETINGINSIGHTS_LANGUAGE", "pt")
+_lang = os.environ.get("MINUTA_LANGUAGE", "pt")
 LANGUAGE = None if _lang == "auto" else _lang
 
 
@@ -159,7 +159,7 @@ def main() -> int:
         tracks["Speaker"] = audio
 
     print(f"model={model_size} rate={rate}Hz channels={channels}", file=sys.stderr)
-    model = load_model(model_size, cpu_threads=int(os.environ.get("MEETINGINSIGHTS_THREADS", "0") or 0))
+    model = load_model(model_size, cpu_threads=int(os.environ.get("MINUTA_THREADS", "0") or 0))
 
     rows = []
     for label, samples in tracks.items():
@@ -169,7 +169,7 @@ def main() -> int:
         print(f"  transcribing {label} ...", file=sys.stderr)
         # The far end of a call (or a single-channel file) can hold several people:
         # tell them apart by voice, splitting even inside one Whisper segment.
-        split = (os.environ.get("MEETINGINSIGHTS_DIARIZE", "on") == "on"
+        split = (os.environ.get("MINUTA_DIARIZE", "on") == "on"
                  and label in (them, "Speaker") and voices_ready())
         segments, _ = model.transcribe(
             prepare(samples), vad_filter=True, word_timestamps=split,
@@ -182,12 +182,12 @@ def main() -> int:
         if split:
             words = [(w.start, w.end, w.word) for seg in segments for w in (seg.words or [])]
             try:
-                runs = split_words(samples, words, int(os.environ.get("MEETINGINSIGHTS_SPEAKERS", "0") or 0))
+                runs = split_words(samples, words, int(os.environ.get("MINUTA_SPEAKERS", "0") or 0))
             except Exception as e:  # noqa: BLE001 - never lose the transcript over this
                 print(f"  voice separation skipped: {str(e)[:80]}", file=sys.stderr)
         if runs:
-            prefix = (os.environ.get("MEETINGINSIGHTS_PREFIX_SPK", "Speaker") if label == "Speaker"
-                      else os.environ.get("MEETINGINSIGHTS_PREFIX_PART", "Participant"))
+            prefix = (os.environ.get("MINUTA_PREFIX_SPK", "Speaker") if label == "Speaker"
+                      else os.environ.get("MINUTA_PREFIX_PART", "Participant"))
             print(f"  {label}: {len({n for _, n, _ in runs})} voices found", file=sys.stderr)
             rows.extend((st, f"{prefix} {n}", tx) for st, n, tx in runs)
             continue

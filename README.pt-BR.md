@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="icons/256x256/meetinginsights.png" alt="MeetingInsights" width="112">
+<img src="icons/256x256/minuta.png" alt="Minuta" width="112">
 
-# MeetingInsights
+# Minuta
 
 **Grave uma reunião. Receba a transcrição e a ata. Nada sai do seu computador.**
 
@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/screenshots/notes.png" alt="Ata de uma reunião no MeetingInsights: resumo, o que importa e itens de ação" width="860">
+<img src="docs/screenshots/notes.png" alt="Ata de uma reunião no Minuta: resumo, o que importa e itens de ação" width="860">
 
 <sub>As capturas de tela mostram a interface em inglês, com dados fictícios. O app segue o idioma do seu sistema.</sub>
 
@@ -122,15 +122,15 @@ pequeno, ele ainda pode errar um detalhe: leia a ata antes de compartilhar.
 **Debian / Ubuntu**: o pacote já traz o llama.cpp, então não é preciso compilar nada:
 
 ```sh
-sudo apt install ./meetinginsights_<versão>_amd64.deb
-meetinginsights setup      # prepara o Python e baixa os modelos, uma vez
+sudo apt install ./minuta_<versão>_amd64.deb
+minuta setup      # prepara o Python e baixa os modelos, uma vez
 ```
 
 **A partir do código-fonte** (qualquer distribuição):
 
 ```sh
 ./install.sh               # instala em ~/.local
-meetinginsights setup
+minuta setup
 ```
 
 <details>
@@ -140,8 +140,8 @@ meetinginsights setup
 git clone --depth 1 https://github.com/ggml-org/llama.cpp
 cd llama.cpp && cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
 cmake --build build -j --target llama-app
-mkdir -p ~/.local/share/meetinginsights/llama
-cp build/bin/llama build/bin/*.so* ~/.local/share/meetinginsights/llama/
+mkdir -p ~/.local/share/minuta/llama
+cp build/bin/llama build/bin/*.so* ~/.local/share/minuta/llama/
 ```
 
 Os binários prontos do projeto original exigem a glibc 2.34, o que exclui o Ubuntu 20.04 e o
@@ -150,36 +150,36 @@ Os binários prontos do projeto original exigem a glibc 2.34, o que exclui o Ubu
 
 ## Uso
 
-Abra o **MeetingInsights** no menu de aplicativos. Em *Nova reunião*, escolha **Gravar**
+Abra o **Minuta** no menu de aplicativos. Em *Nova reunião*, escolha **Gravar**
 (digite um título e, se quiser, um cliente e um foco) ou **Importar um arquivo**. Quando você
 parar, a ata aparece na lista.
 
 No terminal:
 
 ```sh
-meetinginsights start "Alinhamento semanal" --client "Acme" --focus "preço: entrada de 8% ou 10%?"
-meetinginsights stop                       # transcreve e depois escreve a ata
-meetinginsights status
+minuta start "Alinhamento semanal" --client "Acme" --focus "preço: entrada de 8% ou 10%?"
+minuta stop                       # transcreve e depois escreve a ata
+minuta status
 
-meetinginsights import ligacao.mp4 "Kickoff" --client "Acme"
-meetinginsights notes <transcricao.txt>    # gera a ata de novo a partir de uma transcrição
-meetinginsights reprocess <nome> [--notes-only] [--client N] [--focus T]
-meetinginsights rename <nome> "Novo título"
-meetinginsights export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
-meetinginsights delete <nome>
-meetinginsights obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian
-meetinginsights trello send <nome> [--only 1,3] [--dry-run]       # itens de ação viram cartões do Trello
-meetinginsights search [--client N] palavras  # encontra reuniões pelo que foi dito
-meetinginsights recover [--list]           # conclui uma gravação interrompida
+minuta import ligacao.mp4 "Kickoff" --client "Acme"
+minuta notes <transcricao.txt>    # gera a ata de novo a partir de uma transcrição
+minuta reprocess <nome> [--notes-only] [--client N] [--focus T]
+minuta rename <nome> "Novo título"
+minuta export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
+minuta delete <nome>
+minuta obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian
+minuta trello send <nome> [--only 1,3] [--dry-run]       # itens de ação viram cartões do Trello
+minuta search [--client N] palavras  # encontra reuniões pelo que foi dito
+minuta recover [--list]           # conclui uma gravação interrompida
 ```
 
 `<nome>` é o nome do arquivo sem a extensão, por exemplo `2026-11-09_14-36_alinhamento-semanal`.
-Rode `meetinginsights help` para ver a lista completa. O comando
-`meetinginsights stop --capture-only` salva o áudio em alguns segundos e deixa o resto para
-`meetinginsights finish <nome>`; o app usa isso para manter a janela livre.
+Rode `minuta help` para ver a lista completa. O comando
+`minuta stop --capture-only` salva o áudio em alguns segundos e deixa o resto para
+`minuta finish <nome>`; o app usa isso para manter a janela livre.
 
 As atas ficam em `~/MeetingNotes/`; o áudio e as transcrições, em
-`~/.local/share/meetinginsights/rec/`.
+`~/.local/share/minuta/rec/`.
 
 ### Clientes e glossários
 
@@ -189,8 +189,8 @@ aproximadas. No app, digite o cliente em *Nova reunião* e clique em **Glossári
 de comando:
 
 ```sh
-meetinginsights client set "Acme" "Be In Rio, Lumière, uso próprio, IA Zap"
-meetinginsights client list | show "Acme" | rm "Acme"
+minuta client set "Acme" "Be In Rio, Lumière, uso próprio, IA Zap"
+minuta client list | show "Acme" | rm "Acme"
 ```
 
 O *foco* é um texto livre para uma reunião. Ele orienta o resumo e preenche a seção **Em foco**
@@ -199,7 +199,7 @@ use o glossário ou a configuração *Prompt inicial*.
 
 ## Configurar o Obsidian
 
-O MeetingInsights salva uma reunião como uma nota Markdown dentro do seu vault. O vault é só
+O Minuta salva uma reunião como uma nota Markdown dentro do seu vault. O vault é só
 uma pasta de arquivos, então o app apenas escreve arquivos, e **nunca fora do vault**.
 
 ### Passo a passo
@@ -208,7 +208,7 @@ uma pasta de arquivos, então o app apenas escreve arquivos, e **nunca fora do v
 Obsidian**: na primeira vez, ele pergunta qual é a pasta do vault. Ou pelo terminal:
 
 ```sh
-meetinginsights config obsidian_vault ~/Documentos/MeuVault
+minuta config obsidian_vault ~/Documentos/MeuVault
 ```
 
 O caminho precisa ser uma pasta que já exista. Para trocar de vault depois, use **Exportar →
@@ -218,7 +218,7 @@ Escolher o vault do Obsidian…** ou rode o comando acima de novo.
 Você pode usar `{client}` para separar por cliente:
 
 ```sh
-meetinginsights config obsidian_folder "Clientes/{client}/Reuniões"
+minuta config obsidian_folder "Clientes/{client}/Reuniões"
 ```
 
 A pasta é sempre relativa ao vault. Reuniões sem cliente vão para `Clientes/Inbox/Reuniões`
@@ -229,9 +229,9 @@ como chegar a elas a partir do resto do vault, use as três opções abaixo. Ela
 app, no botão **Glossário**, em *No seu vault do Obsidian*:
 
 ```sh
-meetinginsights client config "Acme" folder "Clientes/Acme/Reuniões"
-meetinginsights client config "Acme" hub    "Clientes/Acme/_HUB"               # linkado no topo da nota
-meetinginsights client config "Acme" index  "Clientes/Acme/Reuniões/_Índice"   # ganha uma linha por reunião
+minuta client config "Acme" folder "Clientes/Acme/Reuniões"
+minuta client config "Acme" hub    "Clientes/Acme/_HUB"               # linkado no topo da nota
+minuta client config "Acme" index  "Clientes/Acme/Reuniões/_Índice"   # ganha uma linha por reunião
 ```
 
 | Opção | O que faz |
@@ -247,15 +247,15 @@ gravar ou importar (`--client "Acme"`, ou o campo *Cliente* em *Nova reunião*).
 antiga, associe-o e reescreva a ata (isso substitui a ata atual):
 
 ```sh
-meetinginsights reprocess <nome> --notes-only --client "Acme"
+minuta reprocess <nome> --notes-only --client "Acme"
 ```
 
 **5. Exporte.** No app, **Exportar → Nota no Obsidian**. No terminal:
 
 ```sh
-meetinginsights obsidian <nome>                    # transcrição incluída, em bloco dobrável
-meetinginsights obsidian <nome> --no-transcript    # só a ata
-meetinginsights obsidian <nome> --folder "Inbox"   # pasta só desta vez
+minuta obsidian <nome>                    # transcrição incluída, em bloco dobrável
+minuta obsidian <nome> --no-transcript    # só a ata
+minuta obsidian <nome> --folder "Inbox"   # pasta só desta vez
 ```
 
 O comando imprime o caminho da nota criada (e "added to the index" quando o índice foi
@@ -275,8 +275,8 @@ data: 2026-11-10
 cliente: "Acme"
 participantes: [Maria, Tom]
 duration_min: 47
-tags: [reuniao, meetinginsights, acme]
-fonte: MeetingInsights (transcrição automática; confira antes de agir)
+tags: [reuniao, minuta, acme]
+fonte: Minuta (transcrição automática; confira antes de agir)
 meeting: 2026-11-10_14-00_alinhamento-semanal
 ---
 
@@ -309,7 +309,7 @@ Em inglês, as chaves viram `type: meeting`, `date`, `client` e `participants`.
   caminho absoluto é lido como relativo ao vault.
 - **A nota não aparece no grafo ligada a nada**: configure o `hub` e o `index` do cliente
   (passo 3). Sem isso, a nota existe, mas nada aponta para ela.
-- Se o seu vault usa outras convenções de frontmatter, edite as notas depois: o MeetingInsights
+- Se o seu vault usa outras convenções de frontmatter, edite as notas depois: o Minuta
   só cria e atualiza o arquivo que ele mesmo gerou.
 
 ## Itens de ação para o Trello
@@ -323,28 +323,28 @@ nunca são duplicados, mesmo que você envie a reunião de novo.
 Pelo terminal:
 
 ```sh
-meetinginsights trello login               # pede a chave de API e o token (o token fica oculto)
-meetinginsights trello boards              # id <TAB> nome
-meetinginsights trello lists <id-do-quadro>
-meetinginsights trello use <id-da-lista> "Backlog"
-meetinginsights trello send <nome> --dry-run          # mostra o que seria criado
-meetinginsights trello send <nome> [--only 1,3]       # cria os cartões (todos, ou só as linhas escolhidas)
-meetinginsights trello logout
+minuta trello login               # pede a chave de API e o token (o token fica oculto)
+minuta trello boards              # id <TAB> nome
+minuta trello lists <id-do-quadro>
+minuta trello use <id-da-lista> "Backlog"
+minuta trello send <nome> --dry-run          # mostra o que seria criado
+minuta trello send <nome> [--only 1,3]       # cria os cartões (todos, ou só as linhas escolhidas)
+minuta trello logout
 ```
 
 Crie a chave e o token você mesmo em <https://trello.com/power-ups/admin> (*New*, depois *API key*; a
-mesma página oferece o *Token*). Eles ficam em `~/.config/meetinginsights/trello`, legível só por você,
+mesma página oferece o *Token*). Eles ficam em `~/.config/minuta/trello`, legível só por você,
 viajam no corpo de uma requisição HTTPS (nunca numa URL) e não aparecem na lista de processos. Definir
-`MEETINGINSIGHTS_TRELLO_KEY` e `MEETINGINSIGHTS_TRELLO_TOKEN` mantém os dois fora de qualquer arquivo.
-Os itens já enviados ficam registrados em `~/.local/share/meetinginsights/rec/<nome>.trello`.
+`MINUTA_TRELLO_KEY` e `MINUTA_TRELLO_TOKEN` mantém os dois fora de qualquer arquivo.
+Os itens já enviados ficam registrados em `~/.local/share/minuta/rec/<nome>.trello`.
 
 **Dica:** para o Trello receber o texto certo, confira a ata antes. Os itens de ação são extraídos
 por regras sobre a transcrição e podem conter falhas de transcrição.
 
 ## Configurações
 
-Abra **Configurações** no app, ou use `meetinginsights config [chave [valor]]` e
-`meetinginsights language`.
+Abra **Configurações** no app, ou use `minuta config [chave [valor]]` e
+`minuta language`.
 
 <table>
 <tr>
@@ -369,16 +369,16 @@ Abra **Configurações** no app, ou use `meetinginsights config [chave [valor]]`
 </table>
 
 As variáveis de ambiente prevalecem sobre o arquivo de configurações
-(`~/.config/meetinginsights/config`):
+(`~/.config/minuta/config`):
 
 | Variável | Significado |
 |---|---|
-| `MEETINGINSIGHTS_OUT` | onde as atas são gravadas (padrão `~/MeetingNotes`) |
-| `MEETINGINSIGHTS_HOME` | onde ficam os modelos, o áudio e as transcrições |
-| `MEETINGINSIGHTS_WHISPER_MODEL` | modelo de transcrição |
-| `MEETINGINSIGHTS_LLM_MODEL` | qualquer modelo de chat GGUF para o redator local |
-| `MEETINGINSIGHTS_YOU` / `MEETINGINSIGHTS_THEM` | rótulos dos canais |
-| `MEETINGINSIGHTS_LIVE` | `0` desliga a transcrição ao vivo |
+| `MINUTA_OUT` | onde as atas são gravadas (padrão `~/MeetingNotes`) |
+| `MINUTA_HOME` | onde ficam os modelos, o áudio e as transcrições |
+| `MINUTA_WHISPER_MODEL` | modelo de transcrição |
+| `MINUTA_LLM_MODEL` | qualquer modelo de chat GGUF para o redator local |
+| `MINUTA_YOU` / `MINUTA_THEM` | rótulos dos canais |
+| `MINUTA_LIVE` | `0` desliga a transcrição ao vivo |
 
 ## Privacidade
 
@@ -395,7 +395,7 @@ As variáveis de ambiente prevalecem sobre o arquivo de configurações
 - **Obsidian:** a exportação só escreve arquivos dentro da pasta do vault que você escolheu.
 
 > **Consentimento para gravar.** Gravar uma conversa sem avisar os outros participantes é
-> ilegal em muitos lugares. O `meetinginsights start` imprime um lembrete; respeite-o.
+> ilegal em muitos lugares. O `minuta start` imprime um lembrete; respeite-o.
 
 ## Desenvolvimento
 
@@ -410,7 +410,7 @@ teste de ponta a ponta para uma gravação e o texto de referência dela:
 
 ```sh
 MI_E2E_AUDIO=fala.wav MI_E2E_REFERENCE=fala.txt MI_E2E_MAX_WER=0.20 \
-  ~/.local/share/meetinginsights/venv/bin/python -m unittest tests.test_e2e
+  ~/.local/share/minuta/venv/bin/python -m unittest tests.test_e2e
 ```
 
 As capturas de tela deste README são geradas a partir de dados fictícios (nada de reuniões
@@ -422,7 +422,7 @@ MIT. Veja o [`LICENSE`](LICENSE).
 
 ## Links
 
-- Código-fonte: https://github.com/bcocheto/meetinginsights-linux
-- Baseado em https://github.com/techbysaurabh/meetinginsights-linux
-- A versão para iOS, *MeetingInsights: AI Minutes*, está na App Store; esta é a contraparte
-  para Linux e compartilha o ícone e a linguagem visual.
+- Código-fonte: https://github.com/bcocheto/minuta
+- A Minuta nasceu de um fork de [techbysaurabh/meetinginsights-linux](https://github.com/techbysaurabh/meetinginsights-linux)
+  (MIT) e mantém o aviso dessa licença. O nome, o ícone e a maior parte do código desde então são novos.
+- Antes se chamava *MeetingInsights*: as configurações e os dados são movidos automaticamente na primeira vez que o `minuta` roda.

@@ -18,8 +18,8 @@ ACCENT_RGB = (0x35, 0x84, 0xE4)
 SPEAKER_COLORS = ["3584E4", "26A269", "E5A50A", "C061CB", "E66100", "1C71D8"]
 
 LABELS = {
-    "pt": {"transcript": "Transcrição", "exported": "Exportado pelo MeetingInsights"},
-    "en": {"transcript": "Transcript", "exported": "Exported by MeetingInsights"},
+    "pt": {"transcript": "Transcrição", "exported": "Exportado pelo Minuta"},
+    "en": {"transcript": "Transcript", "exported": "Exported by Minuta"},
 }
 
 

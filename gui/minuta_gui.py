@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""MeetingInsights — GTK desktop app for on-device meeting recording, transcription and notes.
+"""Minuta — GTK desktop app for on-device meeting recording, transcription and notes.
 
-The UI is a thin layer over the `meetinginsights` CLI: it shells out for start/stop and
+The UI is a thin layer over the `minuta` CLI: it shells out for start/stop and
 reads the resulting markdown from the notes directory. Everything — recording,
 transcription and note writing — happens on this machine; nothing is uploaded.
 """
@@ -45,12 +45,12 @@ STRINGS = {
         "Language: auto-detect": "Idioma: detectar automaticamente",
         "Spoken language of the meeting": "Idioma falado na reunião",
         "Could not save the language": "Não foi possível salvar o idioma",
-        "Set up MeetingInsights": "Configurar o MeetingInsights",
+        "Set up Minuta": "Configurar o Minuta",
         "<b>One-time setup</b>": "<b>Configuração inicial</b>",
-        "MeetingInsights needs a speech model and a language model so it can "
+        "Minuta needs a speech model and a language model so it can "
         "transcribe and summarise without sending anything to a server.\n\n"
         "This downloads about 1.5 GB once. Everything afterwards runs offline.":
-            "O MeetingInsights precisa de um modelo de fala e de um modelo de linguagem para "
+            "O Minuta precisa de um modelo de fala e de um modelo de linguagem para "
             "transcrever e resumir sem enviar nada a um servidor.\n\n"
             "Isso baixa cerca de 1,5 GB uma única vez. Depois, tudo roda offline.",
         "Ready to start": "Pronto para começar",
@@ -205,7 +205,7 @@ STRINGS = {
         "Press Stop": "Clique em Parar",
         "The transcript and the notes appear here, ready to export.":
             "A transcrição e a ata aparecem aqui, prontas para exportar.",
-        "Welcome to MeetingInsights": "Bem-vindo ao MeetingInsights",
+        "Welcome to Minuta": "Bem-vindo ao Minuta",
         "Record a meeting and get a transcript and notes.": "Grave uma reunião e receba a transcrição e a ata.",
         "Everything runs on this computer unless you choose a cloud service in Settings.":
             "Tudo roda neste computador, a menos que você escolha um serviço na nuvem em Configurações.",
@@ -248,24 +248,29 @@ def T(text: str, **kw) -> str:
 
 
 HOME = Path.home()
-NOTES_DIR = Path(os.environ.get("MEETINGINSIGHTS_OUT", HOME / "MeetingNotes"))
-for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/meetinginsights/lib")):
+NOTES_DIR = Path(os.environ.get("MINUTA_OUT", HOME / "MeetingNotes"))
+for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/minuta/lib")):
     if (_lib / "levels.py").exists():
         sys.path.insert(0, str(_lib)); break
 import levels  # noqa: E402
 import search as msearch  # noqa: E402
 
-DATA_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights"))
-LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "meetinginsights" / "language"
+DATA_DIR = Path(os.environ.get("MINUTA_HOME", HOME / ".local/share/minuta"))
+LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "minuta" / "language"
 LANGUAGES = [  # (setting stored in the config file, label)
     ("system", T("Language: system default")),
     ("auto", T("Language: auto-detect")),
     ("pt", "Português"), ("en", "English"), ("es", "Español"),
     ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
 ]
-REC_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights")) / "rec"
-CLI = os.environ.get("MEETINGINSIGHTS_CLI") or shutil.which("meetinginsights") or str(
-    Path(__file__).resolve().parent.parent / "bin" / "meetinginsights")
+REC_DIR = Path(os.environ.get("MINUTA_HOME", HOME / ".local/share/minuta")) / "rec"
+CLI = os.environ.get("MINUTA_CLI") or shutil.which("minuta") or str(
+    Path(__file__).resolve().parent.parent / "bin" / "minuta")
+
+try:   # the first call also carries the data over from the app's former name (MeetingInsights)
+    subprocess.run([CLI, "status"], capture_output=True, timeout=60)
+except (OSError, subprocess.SubprocessError):
+    pass
 
 # ---------------------------------------------------------------- theme
 # Same visual language as Gavetta: neutral dark surface, GNOME blue accent,
@@ -493,13 +498,13 @@ def inline(t: str) -> str:
 class SetupDialog(Gtk.Dialog):
     """First-run setup: prepares the Python environment and downloads the models.
 
-    The work is done by `meetinginsights setup --porcelain`, which emits
+    The work is done by `minuta setup --porcelain`, which emits
     STEP/PCT/ERR/DONE lines; this dialog only renders them. Keeping the logic in
     the CLI means the terminal and the desktop app cannot drift apart.
     """
 
     def __init__(self, parent, cli):
-        super().__init__(title=T("Set up MeetingInsights"), transient_for=parent, modal=True)
+        super().__init__(title=T("Set up Minuta"), transient_for=parent, modal=True)
         self.cli = cli
         self.ok = False
         self.proc = None
@@ -523,7 +528,7 @@ class SetupDialog(Gtk.Dialog):
 
         blurb = Gtk.Label(xalign=0, wrap=True)
         blurb.set_text(T(
-            "MeetingInsights needs a speech model and a language model so it can "
+            "Minuta needs a speech model and a language model so it can "
             "transcribe and summarise without sending anything to a server.\n\n"
             "This downloads about 1.5 GB once. Everything afterwards runs offline."))
         blurb.get_style_context().add_class("dim-label")
@@ -612,16 +617,16 @@ class SetupDialog(Gtk.Dialog):
         return False
 
 
-class MeetingInsightsWindow(Gtk.ApplicationWindow):
+class MinutaWindow(Gtk.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="MeetingInsights")
+        super().__init__(application=app, title="Minuta")
         self.set_default_size(1120, 720)
         self.busy = False
         self.started_at = None
         self.mode = "idle"
         self.selected = None
 
-        hb = Gtk.HeaderBar(show_close_button=True, title="MeetingInsights")
+        hb = Gtk.HeaderBar(show_close_button=True, title="Minuta")
         self.set_titlebar(hb)
 
         root = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -632,7 +637,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         side.get_style_context().add_class("sidebar")
         side.set_size_request(270, -1)
-        title = Gtk.Label(label="MeetingInsights", xalign=0)
+        title = Gtk.Label(label="Minuta", xalign=0)
         title.get_style_context().add_class("sidebar-title")
         side.pack_start(title, False, False, 0)
         self.new_btn = Gtk.Button()
@@ -1046,7 +1051,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
 
     # ---------- first run ----------
     def is_ready(self):
-        """`meetinginsights ready` exits non-zero until setup has been run."""
+        """`minuta ready` exits non-zero until setup has been run."""
         try:
             return self.cli("ready").returncode == 0
         except Exception:
@@ -1888,7 +1893,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
     # ---------- helpers ----------
     def notify(self, summary, body):
         try:
-            n = Notify.Notification.new(summary, body, "meetinginsights")
+            n = Notify.Notification.new(summary, body, "minuta")
             n.show()
         except Exception:
             pass
@@ -1901,15 +1906,15 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         d.run(); d.destroy()
 
 
-class MeetingInsightsApp(Gtk.Application):
+class MinutaApp(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id="page.saurabh.MeetingInsights")
+        super().__init__(application_id="io.github.bcocheto.Minuta")
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
-        GLib.set_prgname("page.saurabh.MeetingInsights")
-        Gtk.Window.set_default_icon_name("meetinginsights")
-        Notify.init("MeetingInsights")
+        GLib.set_prgname("io.github.bcocheto.Minuta")
+        Gtk.Window.set_default_icon_name("minuta")
+        Notify.init("Minuta")
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(
@@ -1917,11 +1922,11 @@ class MeetingInsightsApp(Gtk.Application):
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     def do_activate(self):
-        win = self.get_active_window() or MeetingInsightsWindow(self)
+        win = self.get_active_window() or MinutaWindow(self)
         win.show_all()
         win.present()
 
 
 if __name__ == "__main__":
     import sys
-    sys.exit(MeetingInsightsApp().run(sys.argv))
+    sys.exit(MinutaApp().run(sys.argv))

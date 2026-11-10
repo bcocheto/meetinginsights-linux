@@ -1,14 +1,16 @@
-Package: meetinginsights
+Package: minuta
 Version: 0.7.0
 Section: sound
 Priority: optional
 Architecture: amd64
 Depends: python3 (>= 3.8), python3-venv, python3-gi, gir1.2-gtk-3.0, gir1.2-webkit2-4.0, gir1.2-notify-0.7, pulseaudio-utils, ffmpeg, curl, libc6 (>= 2.14), libgcc-s1, libstdc++6
 Installed-Size: 43764
-Maintainer: techbysaurabh <hi.techbysaurabh@gmail.com>
-Homepage: https://github.com/bcocheto/meetinginsights-linux
+Conflicts: meetinginsights
+Replaces: meetinginsights
+Maintainer: Breno Cocheto <breno.cocheto@gmail.com>
+Homepage: https://github.com/bcocheto/minuta
 Description: On-device meeting recorder and AI note taker
- MeetingInsights records a meeting from the microphone and system audio,
+ Minuta records a meeting from the microphone and system audio,
  transcribes it locally with faster-whisper (on the NVIDIA GPU when there
  is one) and writes structured minutes with a local language model. No
  account and no API key; audio and transcripts stay on the machine unless
@@ -19,5 +21,5 @@ Description: On-device meeting recorder and AI note taker
  offline diarization model, and action-item owners are read off those
  labels instead of being inferred.
  .
- A one-time "meetinginsights setup" downloads the speech and language
+ A one-time "minuta setup" downloads the speech and language
  models (about 1.5 GB) and prepares the Python environment.

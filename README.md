@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="icons/256x256/meetinginsights.png" alt="MeetingInsights" width="112">
+<img src="icons/256x256/minuta.png" alt="Minuta" width="112">
 
-# MeetingInsights
+# Minuta
 
 **Record a meeting. Get the transcript and the minutes. Nothing leaves your computer.**
 
@@ -17,7 +17,7 @@
 
 <br>
 
-<img src="docs/screenshots/notes.png" alt="Meeting notes in MeetingInsights: summary, what matters, action items" width="860">
+<img src="docs/screenshots/notes.png" alt="Meeting notes in Minuta: summary, what matters, action items" width="860">
 
 </div>
 
@@ -119,15 +119,15 @@ detail wrong, so read the notes before you share them.
 **Debian / Ubuntu** — the package bundles the llama.cpp runtime, so nothing has to be compiled:
 
 ```sh
-sudo apt install ./meetinginsights_<version>_amd64.deb
-meetinginsights setup      # prepares Python and downloads the models, once
+sudo apt install ./minuta_<version>_amd64.deb
+minuta setup      # prepares Python and downloads the models, once
 ```
 
 **From source** (any distro):
 
 ```sh
 ./install.sh               # installs to ~/.local
-meetinginsights setup
+minuta setup
 ```
 
 <details>
@@ -137,8 +137,8 @@ meetinginsights setup
 git clone --depth 1 https://github.com/ggml-org/llama.cpp
 cd llama.cpp && cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
 cmake --build build -j --target llama-app
-mkdir -p ~/.local/share/meetinginsights/llama
-cp build/bin/llama build/bin/*.so* ~/.local/share/meetinginsights/llama/
+mkdir -p ~/.local/share/minuta/llama
+cp build/bin/llama build/bin/*.so* ~/.local/share/minuta/llama/
 ```
 
 Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04 and 22.04 —
@@ -147,36 +147,36 @@ which is why the `.deb` ships its own build.
 
 ## Use
 
-Open **MeetingInsights** from the applications menu. In *New meeting* choose **Record**
+Open **Minuta** from the applications menu. In *New meeting* choose **Record**
 (type a title, optionally a client and a focus) or **Import a file**. When you stop, the
 notes appear in the list.
 
 From the terminal:
 
 ```sh
-meetinginsights start "Weekly sync" --client "Acme" --focus "pricing: 8% or 10% down payment?"
-meetinginsights stop                       # transcribes, then writes the notes
-meetinginsights status
+minuta start "Weekly sync" --client "Acme" --focus "pricing: 8% or 10% down payment?"
+minuta stop                       # transcribes, then writes the notes
+minuta status
 
-meetinginsights import call.mp4 "Kickoff" --client "Acme"
-meetinginsights notes <transcript.txt>     # regenerate notes from a transcript
-meetinginsights reprocess <name> [--notes-only] [--client N] [--focus T]
-meetinginsights rename <name> "New title"
-meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]
-meetinginsights delete <name>
-meetinginsights obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault
-meetinginsights trello send <name> [--only 1,3] [--dry-run]       # action items to Trello cards
-meetinginsights search [--client N] words  # find meetings by what was said
-meetinginsights recover [--list]           # finish an interrupted recording
+minuta import call.mp4 "Kickoff" --client "Acme"
+minuta notes <transcript.txt>     # regenerate notes from a transcript
+minuta reprocess <name> [--notes-only] [--client N] [--focus T]
+minuta rename <name> "New title"
+minuta export <name> <md|docx|pdf> [file] [--no-transcript]
+minuta delete <name>
+minuta obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault
+minuta trello send <name> [--only 1,3] [--dry-run]       # action items to Trello cards
+minuta search [--client N] words  # find meetings by what was said
+minuta recover [--list]           # finish an interrupted recording
 ```
 
-`<name>` is the file stem, e.g. `2026-11-09_14-36_weekly-sync`. Run `meetinginsights help`
-for the full list. `meetinginsights stop --capture-only` saves the audio in a couple of
-seconds and leaves the rest to `meetinginsights finish <name>`; the app uses this to keep
+`<name>` is the file stem, e.g. `2026-11-09_14-36_weekly-sync`. Run `minuta help`
+for the full list. `minuta stop --capture-only` saves the audio in a couple of
+seconds and leaves the rest to `minuta finish <name>`; the app uses this to keep
 the window free.
 
 Notes land in `~/MeetingNotes/`; audio and transcripts in
-`~/.local/share/meetinginsights/rec/`.
+`~/.local/share/minuta/rec/`.
 
 ### Clients and glossaries
 
@@ -186,8 +186,8 @@ spellings. In the app, type the client in *New meeting* and press **Glossary**; 
 CLI:
 
 ```sh
-meetinginsights client set "Acme" "Be In Rio, Lumière, own use, IA Zap"
-meetinginsights client list | show "Acme" | rm "Acme"
+minuta client set "Acme" "Be In Rio, Lumière, own use, IA Zap"
+minuta client list | show "Acme" | rm "Acme"
 ```
 
 The *focus* is free text for one meeting. It steers the summary and fills the **In focus**
@@ -199,11 +199,11 @@ transcriber; use the glossary or the *Initial prompt* setting for that.
 > Passo a passo em português: [README.pt-BR.md → Configurar o Obsidian](README.pt-BR.md#configurar-o-obsidian).
 
 Point the app at your vault once, then export any meeting from **Export → Obsidian note** (the
-app asks for the vault the first time) or with `meetinginsights obsidian <name>`:
+app asks for the vault the first time) or with `minuta obsidian <name>`:
 
 ```sh
-meetinginsights config obsidian_vault ~/Documents/MyVault
-meetinginsights config obsidian_folder "Clients/{client}/Meetings"   # default: Meetings
+minuta config obsidian_vault ~/Documents/MyVault
+minuta config obsidian_folder "Clients/{client}/Meetings"   # default: Meetings
 ```
 
 The note is named `YYYY-MM-DD - Title.md`, with frontmatter (`type`, `created`, `updated`,
@@ -216,9 +216,9 @@ nothing is ever written outside the vault.
 For each client you can also say where its meetings live and how to reach them:
 
 ```sh
-meetinginsights client config "Acme" folder "Clients/Acme/Meetings"
-meetinginsights client config "Acme" hub    "Clients/Acme/_HUB"          # linked at the top of the note
-meetinginsights client config "Acme" index  "Clients/Acme/Meetings/Index" # a row (or bullet) is added
+minuta client config "Acme" folder "Clients/Acme/Meetings"
+minuta client config "Acme" hub    "Clients/Acme/_HUB"          # linked at the top of the note
+minuta client config "Acme" index  "Clients/Acme/Meetings/Index" # a row (or bullet) is added
 ```
 
 These are also in the app, under **Glossary**. The index gets one new row if it has a table
@@ -236,25 +236,25 @@ never duplicated, even if you send the meeting again.
 From the terminal:
 
 ```sh
-meetinginsights trello login               # asks for the API key and the token (the token is hidden)
-meetinginsights trello boards              # id <TAB> name
-meetinginsights trello lists <board-id>
-meetinginsights trello use <list-id> "Backlog"
-meetinginsights trello send <name> --dry-run          # show what would be created
-meetinginsights trello send <name> [--only 1,3]       # create the cards (all, or the chosen rows)
-meetinginsights trello logout
+minuta trello login               # asks for the API key and the token (the token is hidden)
+minuta trello boards              # id <TAB> name
+minuta trello lists <board-id>
+minuta trello use <list-id> "Backlog"
+minuta trello send <name> --dry-run          # show what would be created
+minuta trello send <name> [--only 1,3]       # create the cards (all, or the chosen rows)
+minuta trello logout
 ```
 
 Create the key and the token yourself on <https://trello.com/power-ups/admin> (*New*, then *API key*;
-the same page offers a *Token*). They are stored in `~/.config/meetinginsights/trello`, readable only by
+the same page offers a *Token*). They are stored in `~/.config/minuta/trello`, readable only by
 you, travel in the body of an HTTPS request (never in a URL) and are never shown in the process list.
-Setting `MEETINGINSIGHTS_TRELLO_KEY` and `MEETINGINSIGHTS_TRELLO_TOKEN` instead keeps them out of any file.
-Which items were already sent is remembered in `~/.local/share/meetinginsights/rec/<name>.trello`.
+Setting `MINUTA_TRELLO_KEY` and `MINUTA_TRELLO_TOKEN` instead keeps them out of any file.
+Which items were already sent is remembered in `~/.local/share/minuta/rec/<name>.trello`.
 
 ## Settings
 
-Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
-`meetinginsights language`.
+Open **Settings** in the app, or use `minuta config [key [value]]` and
+`minuta language`.
 
 <table>
 <tr>
@@ -278,16 +278,16 @@ Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
 </tr>
 </table>
 
-Environment variables override the settings file (`~/.config/meetinginsights/config`):
+Environment variables override the settings file (`~/.config/minuta/config`):
 
 | Variable | Meaning |
 |---|---|
-| `MEETINGINSIGHTS_OUT` | where notes are written (default `~/MeetingNotes`) |
-| `MEETINGINSIGHTS_HOME` | where models, audio and transcripts live |
-| `MEETINGINSIGHTS_WHISPER_MODEL` | transcription model |
-| `MEETINGINSIGHTS_LLM_MODEL` | any GGUF chat model for the local note writer |
-| `MEETINGINSIGHTS_YOU` / `MEETINGINSIGHTS_THEM` | channel labels |
-| `MEETINGINSIGHTS_LIVE` | `0` turns off live transcription |
+| `MINUTA_OUT` | where notes are written (default `~/MeetingNotes`) |
+| `MINUTA_HOME` | where models, audio and transcripts live |
+| `MINUTA_WHISPER_MODEL` | transcription model |
+| `MINUTA_LLM_MODEL` | any GGUF chat model for the local note writer |
+| `MINUTA_YOU` / `MINUTA_THEM` | channel labels |
+| `MINUTA_LIVE` | `0` turns off live transcription |
 
 ## Privacy
 
@@ -303,7 +303,7 @@ Environment variables override the settings file (`~/.config/meetinginsights/con
   on `local` to keep everything offline.
 
 > **Recording consent.** Recording a conversation without telling the other participants is
-> illegal in many places. `meetinginsights start` prints a reminder; please honour it.
+> illegal in many places. `minuta start` prints a reminder; please honour it.
 
 ## Development
 
@@ -318,7 +318,7 @@ reference text:
 
 ```sh
 MI_E2E_AUDIO=talk.wav MI_E2E_REFERENCE=talk.txt MI_E2E_MAX_WER=0.20 \
-  ~/.local/share/meetinginsights/venv/bin/python -m unittest tests.test_e2e
+  ~/.local/share/minuta/venv/bin/python -m unittest tests.test_e2e
 ```
 
 The screenshots in this README are generated from made-up demo data (nothing from real
@@ -330,7 +330,7 @@ MIT — see [`LICENSE`](LICENSE).
 
 ## Links
 
-- Source: https://github.com/bcocheto/meetinginsights-linux
-- Based on https://github.com/techbysaurabh/meetinginsights-linux
-- The iOS sibling, *MeetingInsights: AI Minutes*, is on the App Store — this is the Linux
-  counterpart and shares its icon and design language.
+- Source: https://github.com/bcocheto/minuta
+- Minuta started as a fork of [techbysaurabh/meetinginsights-linux](https://github.com/techbysaurabh/meetinginsights-linux)
+  (MIT) and keeps that licence notice. The name, the icon and most of the code since are new.
+- Formerly *MeetingInsights*: settings and data are moved over automatically the first time `minuta` runs.

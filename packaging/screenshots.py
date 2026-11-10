@@ -6,7 +6,7 @@
 Needs ImageMagick (`import`).
 
 Nothing from your real meetings is used. Needs a graphical session; models/venv are linked
-from ~/.local/share/meetinginsights only so that the app considers itself ready.
+from ~/.local/share/minuta only so that the app considers itself ready.
 """
 import os
 import subprocess
@@ -20,18 +20,20 @@ OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "docs" / "screenshots"
 
 TMP = Path(tempfile.mkdtemp(prefix="mi-shots-"))
 HOME, NOTES, REC, CFG = TMP / "home", TMP / "notes", TMP / "home" / "rec", TMP / "cfg"
-for d in (REC, NOTES, CFG / "meetinginsights" / "clients"):
+for d in (REC, NOTES, CFG / "minuta" / "clients"):
     d.mkdir(parents=True, exist_ok=True)
-real = Path.home() / ".local/share/meetinginsights"
+real = Path.home() / ".local/share/minuta"
+if not real.exists():                      # not migrated yet: the data may still be under the old name
+    real = Path.home() / ".local/share/meetinginsights"
 for d in ("venv", "llama", "models"):
     if (real / d).exists():
         (HOME / d).symlink_to(real / d)
 
-os.environ.update(MEETINGINSIGHTS_HOME=str(HOME), MEETINGINSIGHTS_OUT=str(NOTES), XDG_CONFIG_HOME=str(CFG),
+os.environ.update(MINUTA_HOME=str(HOME), MINUTA_OUT=str(NOTES), XDG_CONFIG_HOME=str(CFG),
                   LC_ALL="en_US.UTF-8", LANG="en_US.UTF-8", LANGUAGE="en_US")
-(CFG / "meetinginsights" / "clients" / "northwind.txt").write_text(
+(CFG / "minuta" / "clients" / "northwind.txt").write_text(
     "Northwind Logistics\nNorthwind, Dock 7, Rivera, SLA tiers, ETA drift, last-mile\n")
-(CFG / "meetinginsights" / "config").write_text("notes_model=medium\nwhisper_model=large-v3-turbo\n")
+(CFG / "minuta" / "config").write_text("notes_model=medium\nwhisper_model=large-v3-turbo\n")
 
 MEETINGS = [
     ("2026-11-10_14-00_pricing-workshop", "Pricing workshop", 47, "Northwind Logistics",
@@ -99,7 +101,7 @@ for m in MEETINGS:
     write(m)
 
 # ---- a fake CLI for the recording screen: status says "recording", everything else is real
-REAL_CLI = ROOT / "bin" / "meetinginsights"
+REAL_CLI = ROOT / "bin" / "minuta"
 FAKE = TMP / "cli"
 FAKE.write_text(f"""#!/bin/bash
 if [[ "$1" == status && -f "{TMP}/recording" ]]; then echo 'Recording "Sprint planning" for 12m (live)'; exit 0; fi
@@ -107,18 +109,18 @@ if [[ "$1" == slow ]]; then sleep 60; exit 0; fi
 exec "{REAL_CLI}" "$@"
 """)
 FAKE.chmod(0o755)
-os.environ["MEETINGINSIGHTS_CLI"] = str(FAKE)
+os.environ["MINUTA_CLI"] = str(FAKE)
 
 sys.path.insert(0, str(ROOT / "gui")); sys.path.insert(0, str(ROOT / "tests"))
 import gi  # noqa: E402
 gi.require_version("GdkX11", "3.0")
 from gi.repository import GdkX11  # noqa: E402,F401
-import meetinginsights_gui as g  # noqa: E402
+import minuta_gui as g  # noqa: E402
 from test_levels import write_wav  # noqa: E402
 from gi.repository import GLib, Gtk  # noqa: E402
 
 OUT.mkdir(parents=True, exist_ok=True)
-app = g.MeetingInsightsApp(); app.register(); app.do_activate()
+app = g.MinutaApp(); app.register(); app.do_activate()
 win = app.get_windows()[0]
 win.set_default_size(1180, 900); win.resize(1180, 900)
 

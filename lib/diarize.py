@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-DATA = Path(os.environ.get("MEETINGINSIGHTS_HOME", Path.home() / ".local/share/meetinginsights"))
+DATA = Path(os.environ.get("MINUTA_HOME", Path.home() / ".local/share/minuta"))
 DIR = DATA / "models" / "diarization"
 SEG_URL = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/"
            "sherpa-onnx-pyannote-segmentation-3-0.tar.bz2")

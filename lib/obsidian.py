@@ -16,10 +16,10 @@ BAD_CHARS = re.compile(r'[\\/:*?"<>|#^\[\]]+')
 WORDS = {
     "pt": {"type": "reuniao", "date": "data", "client": "cliente", "people": "participantes",
            "source": "fonte", "minutes": "min", "hub": "Hub", "transcript": "Transcrição",
-           "source_text": "MeetingInsights (transcrição automática; confira antes de agir)", "section": "Reuniões"},
+           "source_text": "Minuta (transcrição automática; confira antes de agir)", "section": "Reuniões"},
     "en": {"type": "meeting", "date": "date", "client": "client", "people": "participants",
            "source": "source", "minutes": "min", "hub": "Hub", "transcript": "Transcript",
-           "source_text": "MeetingInsights (automatic transcript; check before acting)", "section": "Meetings"},
+           "source_text": "Minuta (automatic transcript; check before acting)", "section": "Meetings"},
 }
 
 
@@ -30,7 +30,7 @@ def _slug(text: str) -> str:
 
 
 def client_config(clients_dir: Path, client: str) -> dict:
-    """folder= / hub= / index= for a client, from ~/.config/meetinginsights/clients/<slug>.cfg"""
+    """folder= / hub= / index= for a client, from ~/.config/minuta/clients/<slug>.cfg"""
     cfg = {}
     try:
         for line in (clients_dir / f"{_slug(client)}.cfg").read_text(encoding="utf-8").splitlines():
@@ -82,7 +82,7 @@ def build_note(name: str, notes: str, transcript: str, client: str, focus: str, 
     minutes, people = _header_bits(notes)
     today = (now or dt.date.today()).isoformat()
 
-    tags = ["reuniao" if lang == "pt" else "meeting", "meetinginsights"] + ([_slug(client)] if client else [])
+    tags = ["reuniao" if lang == "pt" else "meeting", "minuta"] + ([_slug(client)] if client else [])
     fm = ["---", f"type: {w['type']}", f"created: {date}", f"updated: {today}", f"{w['date']}: {date}"]
     if client:
         fm.append(f'{w["client"]}: "{client}"')

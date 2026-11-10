@@ -67,7 +67,7 @@ def card_for(a: dict, meeting: str, title: str) -> dict:
     desc.append(f"Meeting: {title}" + (f" ({when})" if when else ""))
     if a["t"]:
         desc.append(f"At: {a['t']} in the recording")
-    desc.append("\nCreated by MeetingInsights.")
+    desc.append("\nCreated by Minuta.")
     return {"name": a["text"][:512], "desc": "\n".join(desc)}
 
 
@@ -77,7 +77,7 @@ def creds_path(config_dir: Path) -> Path:
 
 
 def load_creds(config_dir: Path) -> tuple[str, str]:
-    key, token = os.environ.get("MEETINGINSIGHTS_TRELLO_KEY", ""), os.environ.get("MEETINGINSIGHTS_TRELLO_TOKEN", "")
+    key, token = os.environ.get("MINUTA_TRELLO_KEY", ""), os.environ.get("MINUTA_TRELLO_TOKEN", "")
     if not (key and token):
         try:
             for line in creds_path(config_dir).read_text().splitlines():
@@ -107,8 +107,8 @@ def save_creds(config_dir: Path, key: str, token: str) -> None:
 def call(method: str, path: str, config_dir: Path, params: dict | None = None):
     key, token = load_creds(config_dir)
     if not (key and token):
-        raise TrelloError("not connected to Trello: run  meetinginsights trello login")
-    base = os.environ.get("MEETINGINSIGHTS_TRELLO_URL", API).rstrip("/")
+        raise TrelloError("not connected to Trello: run  minuta trello login")
+    base = os.environ.get("MINUTA_TRELLO_URL", API).rstrip("/")
     body = urllib.parse.urlencode({**(params or {}), "key": key, "token": token}).encode()
     req = urllib.request.Request(base + path, data=body, method=method,
                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
@@ -117,7 +117,7 @@ def call(method: str, path: str, config_dir: Path, params: dict | None = None):
             return json.loads(r.read().decode() or "null")
     except urllib.error.HTTPError as e:
         e.close()
-        hint = {401: "the key or token was refused; run  meetinginsights trello login",
+        hint = {401: "the key or token was refused; run  minuta trello login",
                 404: "not found: is the list still there?", 429: "Trello says slow down; try again in a minute"}
         raise TrelloError(hint.get(e.code, f"Trello answered {e.code}")) from None
     except (urllib.error.URLError, TimeoutError, OSError) as e:
@@ -162,7 +162,7 @@ def actions_for(name: str, notes_dir: Path, rec_dir: Path) -> list[dict]:
 def send(name: str, notes_dir: Path, rec_dir: Path, config_dir: Path, list_id: str,
          only: set[int] | None = None, dry_run: bool = False) -> list[dict]:
     if not ID_RE.match(list_id or ""):
-        raise TrelloError("no list chosen: meetinginsights trello use <list-id>")
+        raise TrelloError("no list chosen: minuta trello use <list-id>")
     notes = (notes_dir / f"{name}.md").read_text(encoding="utf-8")
     title = title_of(notes, name)
     sent = load_sent(rec_dir, name)

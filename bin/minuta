@@ -1,25 +1,25 @@
 #!/bin/bash
-# meetinginsights — MeetingInsights: AI Note Taker.
+# minuta — Minuta: AI Note Taker.
 #
-#   meetinginsights start "Sprint planning" [--client NAME] [--focus "what matters"]
+#   minuta start "Sprint planning" [--client NAME] [--focus "what matters"]
 #                                             begin recording (microphone + system audio)
-#   meetinginsights client [list|show|set|rm] NAME [terms...]   per-client glossary for names and terms
-#   meetinginsights stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
-#                                             recording; finish later with: meetinginsights finish <name>)
-#   meetinginsights status                    show whether a recording is running
-#   meetinginsights trello login|boards|lists|use|send   send a meeting's action items to Trello cards
-#   meetinginsights obsidian <name> [--folder P]   save a meeting as a note in your Obsidian vault
-#   meetinginsights search [--client NAME] words   find meetings by what was said, in notes and transcripts
-#   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
-#   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
-#   meetinginsights setup                     fetch the speech and language models
-#   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
-#   meetinginsights config [key [value]]     show or set whisper_model, notes_provider, whisper_device
-#   meetinginsights import <audio|video> [title] [--client N] [--focus T]   transcribe an existing file and write the notes
-#   meetinginsights reprocess <name> [--notes-only] [--client N] [--focus T]    transcribe again and rewrite the notes
-#   meetinginsights rename <name> <new title>          rename a meeting
-#   meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
-#   meetinginsights delete <name>                      delete a meeting's notes, transcript and audio
+#   minuta client [list|show|set|rm] NAME [terms...]   per-client glossary for names and terms
+#   minuta stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
+#                                             recording; finish later with: minuta finish <name>)
+#   minuta status                    show whether a recording is running
+#   minuta trello login|boards|lists|use|send   send a meeting's action items to Trello cards
+#   minuta obsidian <name> [--folder P]   save a meeting as a note in your Obsidian vault
+#   minuta search [--client NAME] words   find meetings by what was said, in notes and transcripts
+#   minuta recover [--list]          finish a recording that was cut short and process any left without notes
+#   minuta notes <transcript.txt>    (re)generate notes from a transcript
+#   minuta setup                     fetch the speech and language models
+#   minuta language [system|auto|pt|en|...]   show or set the spoken language
+#   minuta config [key [value]]     show or set whisper_model, notes_provider, whisper_device
+#   minuta import <audio|video> [title] [--client N] [--focus T]   transcribe an existing file and write the notes
+#   minuta reprocess <name> [--notes-only] [--client N] [--focus T]    transcribe again and rewrite the notes
+#   minuta rename <name> <new title>          rename a meeting
+#   minuta export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
+#   minuta delete <name>                      delete a meeting's notes, transcript and audio
 #
 # Nothing leaves the machine: audio is captured with PulseAudio, transcribed by
 # faster-whisper and summarised by a small local GGUF model via llama.cpp. There
@@ -37,20 +37,35 @@ export HF_HUB_DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
 # an explicit prefix, a system install, a ~/.local install, or the source tree.
 _bin_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PREFIX=""
-for _c in "${MEETINGINSIGHTS_PREFIX:-}" \
-          "$_bin_dir/../share/meetinginsights" \
-          "/usr/share/meetinginsights" \
-          "/usr/local/share/meetinginsights" \
+for _c in "${MINUTA_PREFIX:-}" \
+          "$_bin_dir/../share/minuta" \
+          "/usr/share/minuta" \
+          "/usr/local/share/minuta" \
           "$_bin_dir/.."; do
     [[ -n "$_c" && -f "$_c/lib/notes_local.py" ]] && { PREFIX="$(cd "$_c" && pwd)"; break; }
 done
-[[ -n "$PREFIX" ]] || { echo "meetinginsights: cannot locate its lib/ directory" >&2; exit 1; }
+[[ -n "$PREFIX" ]] || { echo "minuta: cannot locate its lib/ directory" >&2; exit 1; }
 
-DATA_DIR="${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}"
-OUT_DIR="${MEETINGINSIGHTS_OUT:-$HOME/MeetingNotes}"
-# Settings live in ~/.config/meetinginsights/config as key=value lines. Environment
-# variables win over the file; see `meetinginsights config`.
-CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/config"
+# --- coming from MeetingInsights, this app's former name: keep the settings, the data and the variables ---
+for _v in $(compgen -e | grep '^MEETINGINSIGHTS_' || true); do
+    _n="MINUTA_${_v#MEETINGINSIGHTS_}"; [[ -n "${!_n:-}" ]] || export "$_n=${!_v}"
+done
+_old_data="$HOME/.local/share/meetinginsights"; _new_data="$HOME/.local/share/minuta"
+_old_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights"; _new_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/minuta"
+if [[ -z "${MINUTA_HOME:-}" && -d "$_old_data" && ! -e "$_new_data" ]]; then
+    mkdir -p "$(dirname "$_new_data")" && mv "$_old_data" "$_new_data" \
+        && echo "minuta: moved your data from $_old_data to $_new_data" >&2
+fi
+if [[ -d "$_old_cfg" && ! -e "$_new_cfg" ]]; then
+    mkdir -p "$(dirname "$_new_cfg")" && mv "$_old_cfg" "$_new_cfg" \
+        && echo "minuta: moved your settings from $_old_cfg to $_new_cfg" >&2
+fi
+
+DATA_DIR="${MINUTA_HOME:-$HOME/.local/share/minuta}"
+OUT_DIR="${MINUTA_OUT:-$HOME/MeetingNotes}"
+# Settings live in ~/.config/minuta/config as key=value lines. Environment
+# variables win over the file; see `minuta config`.
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/minuta/config"
 cfg_get() { # cfg_get <key> <default>
     local v=""
     [[ -f "$CONFIG_FILE" ]] && v=$(sed -n "s/^$1=//p" "$CONFIG_FILE" | tail -n1)
@@ -59,26 +74,26 @@ cfg_get() { # cfg_get <key> <default>
 # "small" is multilingual; "small.en" is English-only; "medium" is more accurate but slower.
 # Default: the faster "turbo" model when the GPU libraries are installed, else "small".
 _default_model=small
-compgen -G "${MEETINGINSIGHTS_HOME:-$HOME/.local/share/meetinginsights}/venv/lib/python*/site-packages/nvidia/cublas" >/dev/null 2>&1 \
-    && [[ "${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_device auto)}" != cpu ]] && _default_model=large-v3-turbo
-WHISPER_MODEL="${MEETINGINSIGHTS_WHISPER_MODEL:-$(cfg_get whisper_model "$_default_model")}"
+compgen -G "${MINUTA_HOME:-$HOME/.local/share/minuta}/venv/lib/python*/site-packages/nvidia/cublas" >/dev/null 2>&1 \
+    && [[ "${MINUTA_DEVICE:-$(cfg_get whisper_device auto)}" != cpu ]] && _default_model=large-v3-turbo
+WHISPER_MODEL="${MINUTA_WHISPER_MODEL:-$(cfg_get whisper_model "$_default_model")}"
 # Processor for speech recognition: auto (GPU when one is usable) or cpu.
-export MEETINGINSIGHTS_DEVICE="${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_device auto)}"
-# Speech options (see `meetinginsights config`)
-export MEETINGINSIGHTS_DIARIZE="${MEETINGINSIGHTS_DIARIZE:-$(cfg_get diarize on)}"
-export MEETINGINSIGHTS_SPEAKERS="${MEETINGINSIGHTS_SPEAKERS:-$(cfg_get speakers 0)}"
-export MEETINGINSIGHTS_PROMPT="${MEETINGINSIGHTS_PROMPT:-$(cfg_get prompt "")}"
-BASE_PROMPT="$MEETINGINSIGHTS_PROMPT"   # the per-meeting glossary is added on top of this
-export MEETINGINSIGHTS_BEAM="${MEETINGINSIGHTS_BEAM:-$(cfg_get beam 5)}"
-export MEETINGINSIGHTS_THREADS="${MEETINGINSIGHTS_THREADS:-$(cfg_get threads 0)}"
-export MEETINGINSIGHTS_NORMALIZE="${MEETINGINSIGHTS_NORMALIZE:-$(cfg_get normalize off)}"
+export MINUTA_DEVICE="${MINUTA_DEVICE:-$(cfg_get whisper_device auto)}"
+# Speech options (see `minuta config`)
+export MINUTA_DIARIZE="${MINUTA_DIARIZE:-$(cfg_get diarize on)}"
+export MINUTA_SPEAKERS="${MINUTA_SPEAKERS:-$(cfg_get speakers 0)}"
+export MINUTA_PROMPT="${MINUTA_PROMPT:-$(cfg_get prompt "")}"
+BASE_PROMPT="$MINUTA_PROMPT"   # the per-meeting glossary is added on top of this
+export MINUTA_BEAM="${MINUTA_BEAM:-$(cfg_get beam 5)}"
+export MINUTA_THREADS="${MINUTA_THREADS:-$(cfg_get threads 0)}"
+export MINUTA_NORMALIZE="${MINUTA_NORMALIZE:-$(cfg_get normalize off)}"
 # Who writes the notes: local (llama.cpp, nothing leaves the machine), claude-code or gemini-cli.
-export MEETINGINSIGHTS_NOTES_PROVIDER="${MEETINGINSIGHTS_NOTES_PROVIDER:-$(cfg_get notes_provider local)}"
+export MINUTA_NOTES_PROVIDER="${MINUTA_NOTES_PROVIDER:-$(cfg_get notes_provider local)}"
 # Spoken language: "system" (follow the OS locale), "auto" (detect), or a code (pt, en, ...).
-# Order: MEETINGINSIGHTS_LANGUAGE env > ~/.config/meetinginsights/language > system.
-LANG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/language"
+# Order: MINUTA_LANGUAGE env > ~/.config/minuta/language > system.
+LANG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/minuta/language"
 resolve_language() {
-    local l="${MEETINGINSIGHTS_LANGUAGE:-}"
+    local l="${MINUTA_LANGUAGE:-}"
     [[ -z "$l" && -s "$LANG_FILE" ]] && l="$(head -n1 "$LANG_FILE" | tr -d '[:space:]')"
     l="${l:-system}"
     if [[ "$l" == system ]]; then
@@ -88,34 +103,34 @@ resolve_language() {
     fi
     echo "${l,,}"
 }
-export MEETINGINSIGHTS_LANGUAGE="$(resolve_language)"
+export MINUTA_LANGUAGE="$(resolve_language)"
 # Size of the local model that writes the summaries: small (0.5B, 0.5 GB, any machine)
 # or medium (3B, 2 GB, noticeably better prose; needs ~3 GB of free RAM).
-export MEETINGINSIGHTS_NOTES_MODEL="${MEETINGINSIGHTS_NOTES_MODEL:-$(cfg_get notes_model small)}"
-case "$MEETINGINSIGHTS_NOTES_MODEL" in
+export MINUTA_NOTES_MODEL="${MINUTA_NOTES_MODEL:-$(cfg_get notes_model small)}"
+case "$MINUTA_NOTES_MODEL" in
     medium) _llm_file=qwen2.5-3b-instruct-q4_k_m.gguf; _llm_repo=Qwen2.5-3B-Instruct-GGUF ;;
     *)      _llm_file=qwen2.5-0.5b-instruct-q4_k_m.gguf; _llm_repo=Qwen2.5-0.5B-Instruct-GGUF ;;
 esac
-LLM_MODEL="${MEETINGINSIGHTS_LLM_MODEL:-$DATA_DIR/models/$_llm_file}"
+LLM_MODEL="${MINUTA_LLM_MODEL:-$DATA_DIR/models/$_llm_file}"
 LLM_URL="https://huggingface.co/Qwen/$_llm_repo/resolve/main/$_llm_file"
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     pt*) _you=Você; _them=Participantes ;;
     *)   _you=You;  _them=Participants ;;
 esac
-YOU_LABEL="${MEETINGINSIGHTS_YOU:-$_you}"
-THEM_LABEL="${MEETINGINSIGHTS_THEM:-$_them}"
-PY="${MEETINGINSIGHTS_PYTHON:-$DATA_DIR/venv/bin/python}"
-LLAMA="${MEETINGINSIGHTS_LLAMA:-}"
+YOU_LABEL="${MINUTA_YOU:-$_you}"
+THEM_LABEL="${MINUTA_THEM:-$_them}"
+PY="${MINUTA_PYTHON:-$DATA_DIR/venv/bin/python}"
+LLAMA="${MINUTA_LLAMA:-}"
 if [[ -z "$LLAMA" ]]; then
-    for _l in "$DATA_DIR/llama/llama" "/usr/lib/meetinginsights/llama/llama" \
-              "/usr/local/lib/meetinginsights/llama/llama"; do
+    for _l in "$DATA_DIR/llama/llama" "/usr/lib/minuta/llama/llama" \
+              "/usr/local/lib/minuta/llama/llama"; do
         [[ -x "$_l" ]] && { LLAMA="$_l"; break; }
     done
     LLAMA="${LLAMA:-$DATA_DIR/llama/llama}"
 fi
 STATE="$DATA_DIR/current"
 
-die()  { echo "meetinginsights: $*" >&2; exit 1; }
+die()  { echo "minuta: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "missing dependency: $1"; }
 
 default_monitor() {
@@ -124,9 +139,9 @@ default_monitor() {
 }
 
 check_ready() {
-    [[ -x "$PY" ]]        || die "python environment missing — run: meetinginsights setup"
-    [[ -x "$LLAMA" ]]     || die "llama.cpp runtime missing — run: meetinginsights setup"
-    [[ -s "$LLM_MODEL" ]] || die "language model missing — run: meetinginsights setup"
+    [[ -x "$PY" ]]        || die "python environment missing — run: minuta setup"
+    [[ -x "$LLAMA" ]]     || die "llama.cpp runtime missing — run: minuta setup"
+    [[ -s "$LLM_MODEL" ]] || die "language model missing — run: minuta setup"
 }
 
 # Emits "PCT|<0-100>" and "STEP|<text>" lines when --porcelain is passed, so the
@@ -169,12 +184,12 @@ cmd_setup() {
             || { echo "ERR|could not create the environment (try: sudo apt install ${_py}-venv)"; return 1; }
         _pct 8
         _step "Installing speech recognition (a few minutes)"
-        "$DATA_DIR/venv/bin/pip" install -q --upgrade pip >/dev/null 2>&1
-        "$DATA_DIR/venv/bin/pip" install -q faster-whisper python-docx reportlab sherpa-onnx >/dev/null 2>&1 \
+        "$DATA_DIR/venv/bin/python" -m pip install -q --upgrade pip >/dev/null 2>&1
+        "$DATA_DIR/venv/bin/python" -m pip install -q faster-whisper python-docx reportlab sherpa-onnx >/dev/null 2>&1 \
             || { echo "ERR|could not install faster-whisper"; return 1; }
         # NVIDIA GPU present: add the CUDA libraries (inside this environment only) for faster transcription
         command -v nvidia-smi >/dev/null 2>&1 && \
-            "$DATA_DIR/venv/bin/pip" install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 >/dev/null 2>&1 || true
+            "$DATA_DIR/venv/bin/python" -m pip install -q nvidia-cublas-cu12 nvidia-cudnn-cu12 >/dev/null 2>&1 || true
         _pct 35
     else
         _step "Python environment ready"; _pct 35
@@ -183,7 +198,7 @@ cmd_setup() {
     # Telling voices apart on the call (optional: a failure here never blocks setup)
     if ! "$PY" -c 'import sherpa_onnx' 2>/dev/null; then
         _step "Installing speaker recognition"
-        "$DATA_DIR/venv/bin/pip" install -q sherpa-onnx >/dev/null 2>&1 || true
+        "$DATA_DIR/venv/bin/python" -m pip install -q sherpa-onnx >/dev/null 2>&1 || true
     fi
     if [[ ! -f "$DATA_DIR/models/diarization/speaker-embedding.onnx" ]]; then
         _step "Downloading the speaker recognition models (about 46 MB)"
@@ -260,7 +275,7 @@ PYEOF
 }
 
 # --- per-meeting context: a client (with a saved glossary) and a focus for the notes ---
-CLIENTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/clients"
+CLIENTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/minuta/clients"
 _slug() { echo "$1" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//'; }
 
 M_CLIENT=""; M_FOCUS=""; M_CLIENT_SET=0; M_FOCUS_SET=0; POS=()
@@ -295,9 +310,9 @@ _meta_env() { # exports the focus/glossary and adds the glossary to the speech p
         f="$CLIENTS_DIR/$(_slug "$M_CLIENT").txt"
         [[ -f "$f" ]] && gloss="$(sed -n '2,$p' "$f" | tr '\n\r' '  ')"
     fi
-    export MEETINGINSIGHTS_CLIENT="$M_CLIENT" MEETINGINSIGHTS_FOCUS="$M_FOCUS" MEETINGINSIGHTS_GLOSSARY="${gloss:0:400}"
-    MEETINGINSIGHTS_PROMPT="$(printf '%s %s' "${gloss:0:400}" "$BASE_PROMPT" | sed 's/^ *//;s/ *$//')"
-    export MEETINGINSIGHTS_PROMPT
+    export MINUTA_CLIENT="$M_CLIENT" MINUTA_FOCUS="$M_FOCUS" MINUTA_GLOSSARY="${gloss:0:400}"
+    MINUTA_PROMPT="$(printf '%s %s' "${gloss:0:400}" "$BASE_PROMPT" | sed 's/^ *//;s/ *$//')"
+    export MINUTA_PROMPT
 }
 
 cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
@@ -305,8 +320,8 @@ cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
     local name="${1:-}" f
     case "$sub" in
         list) for f in "$CLIENTS_DIR"/*.txt; do [[ -f "$f" ]] && head -n1 "$f"; done; return 0 ;;
-        show|rm|set|config) [[ -n "$name" ]] || die "usage: meetinginsights client $sub <name>${sub/#set/ <terms...>}" ;;
-        *) die "usage: meetinginsights client [list|show <name>|set <name> <terms...>|rm <name>|config <name> folder|hub|index <vault path>]" ;;
+        show|rm|set|config) [[ -n "$name" ]] || die "usage: minuta client $sub <name>${sub/#set/ <terms...>}" ;;
+        *) die "usage: minuta client [list|show <name>|set <name> <terms...>|rm <name>|config <name> folder|hub|index <vault path>]" ;;
     esac
     shift
     f="$CLIENTS_DIR/$(_slug "$name").txt"
@@ -317,7 +332,7 @@ cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
         config) # per-client Obsidian settings: folder, hub (note to link back to), index (note that lists the meetings)
               local key="${1:-}" cval="${2:-}" cf="${f%.txt}.cfg"
               [[ -z "$key" ]] && { cat "$cf" 2>/dev/null; return 0; }
-              [[ "$key" =~ ^(folder|hub|index)$ ]] || die "usage: meetinginsights client config <name> folder|hub|index <path inside the vault>"
+              [[ "$key" =~ ^(folder|hub|index)$ ]] || die "usage: minuta client config <name> folder|hub|index <path inside the vault>"
               [[ "$cval" != /* && "$cval" != *..* ]] || die "use a path inside the vault"
               mkdir -p "$CLIENTS_DIR"; [[ -f "$f" ]] || printf '%s\n\n' "${name:0:80}" > "$f"
               touch "$cf"; sed -i "/^$key=/d" "$cf"; [[ -n "$cval" ]] && echo "$key=$cval" >> "$cf"
@@ -332,8 +347,8 @@ cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
 
 cmd_start() {
     if [[ -f "$STATE" ]]; then
-        _rec_alive && die "already recording (see: meetinginsights status)"
-        die "an earlier recording was interrupted; finish it first with: meetinginsights recover"
+        _rec_alive && die "already recording (see: minuta status)"
+        die "an earlier recording was interrupted; finish it first with: minuta recover"
     fi
     need parec; need ffmpeg; check_ready
     _parse_meta_flags "$@"
@@ -379,7 +394,7 @@ cmd_start() {
 
     _meta_save "$base"; _meta_env
     # transcribe while the meeting runs, so stopping is nearly instant
-    if [[ "${MEETINGINSIGHTS_LIVE:-1}" == "1" && -f "$PREFIX/lib/live_transcribe.py" ]]; then
+    if [[ "${MINUTA_LIVE:-1}" == "1" && -f "$PREFIX/lib/live_transcribe.py" ]]; then
         rm -f "$base.stop" "$base.live.done"
         setsid "$PY" "$PREFIX/lib/live_transcribe.py" "$base" \
             "$WHISPER_MODEL" "$YOU_LABEL" "$THEM_LABEL" \
@@ -389,7 +404,7 @@ cmd_start() {
 
     printf '%s\n%s\n%s\n' "$base" "$title" "$(date +%s)" > "$STATE"
     echo "Recording: $title"
-    echo "Stop with: meetinginsights stop"
+    echo "Stop with: minuta stop"
     echo
     echo "Please make sure everyone on the call knows they are being recorded."
 }
@@ -407,7 +422,7 @@ cmd_status() {
     local base title started
     { read -r base; read -r title; read -r started; } < "$STATE"
     if ! _rec_alive; then
-        echo "Interrupted \"$title\" ($(basename "$base")): run meetinginsights recover"; return 0
+        echo "Interrupted \"$title\" ($(basename "$base")): run minuta recover"; return 0
     fi
     echo "Recording \"$title\" for $(( ($(date +%s) - started) / 60 ))m ($(basename "$base"))"
 }
@@ -415,17 +430,17 @@ cmd_status() {
 
 # Split the far-end channel into one label per voice (Participant 1, 2, ...).
 _split_voices() { # _split_voices <wav> <txt> <target-label> <prefix>
-    [[ "$MEETINGINSIGHTS_DIARIZE" == "on" ]] || return 0
+    [[ "$MINUTA_DIARIZE" == "on" ]] || return 0
     [[ -f "$DATA_DIR/models/diarization/speaker-embedding.onnx" ]] || return 0
     echo "Telling voices apart..."
-    "$PY" "$PREFIX/lib/diarize.py" "$1" "$2" "$3" "$4" "$MEETINGINSIGHTS_SPEAKERS" 2>&1 | grep -E "speakers found|no speaker" || true
+    "$PY" "$PREFIX/lib/diarize.py" "$1" "$2" "$3" "$4" "$MINUTA_SPEAKERS" 2>&1 | grep -E "speakers found|no speaker" || true
 }
 _voice_prefixes() { # sets _p_part and _p_spk according to the interface language
     case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
         pt*) _p_part=Participante; _p_spk=Falante ;;
         *)   _p_part=Participant;  _p_spk=Speaker ;;
     esac
-    export MEETINGINSIGHTS_PREFIX_PART="$_p_part" MEETINGINSIGHTS_PREFIX_SPK="$_p_spk"
+    export MINUTA_PREFIX_PART="$_p_part" MINUTA_PREFIX_SPK="$_p_spk"
 }
 _voice_prefixes
 
@@ -574,7 +589,7 @@ _finish_recording() { # _finish_recording <name>
     if cmd_notes "$base.txt" "$title" "$mins"; then rm -f "$base.job"; else return 1; fi
 }
 
-cmd_finish() { [[ -n "${1:-}" ]] || die "usage: meetinginsights finish <name>"; _finish_recording "$1"; }
+cmd_finish() { [[ -n "${1:-}" ]] || die "usage: minuta finish <name>"; _finish_recording "$1"; }
 
 cmd_notes() {
     local transcript="$1" title="${2:-meeting}" mins="${3:-?}"
@@ -585,7 +600,7 @@ cmd_notes() {
     local out="$OUT_DIR/$(basename "${transcript%.txt}").md"
 
     echo "Writing notes on this machine ($(basename "$LLM_MODEL"))..."
-    if MEETINGINSIGHTS_LLAMA_DIR="$(dirname "$LLAMA")" \
+    if MINUTA_LLAMA_DIR="$(dirname "$LLAMA")" \
        "$PY" "$PREFIX/lib/notes_local.py" "$transcript" "$out" "$LLM_MODEL" "$title" "$mins" \
          >"$DATA_DIR/.last_notes.log" 2>&1 && [[ -s "$out" ]]; then
         echo "Notes: $out"
@@ -606,21 +621,21 @@ cmd_config() {
         echo "trello_list=$(cfg_get trello_list "") ($(cfg_get trello_list_name ""))"
         echo "obsidian_vault=$(cfg_get obsidian_vault "")"
         echo "obsidian_folder=$(cfg_get obsidian_folder Meetings)"
-        echo "notes_model=$MEETINGINSIGHTS_NOTES_MODEL"
-        echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
-        echo "whisper_device=$MEETINGINSIGHTS_DEVICE"
-        echo "diarize=$MEETINGINSIGHTS_DIARIZE"
-        echo "speakers=$MEETINGINSIGHTS_SPEAKERS"
-        echo "beam=$MEETINGINSIGHTS_BEAM"
-        echo "threads=$MEETINGINSIGHTS_THREADS"
-        echo "normalize=$MEETINGINSIGHTS_NORMALIZE"
-        echo "prompt=$MEETINGINSIGHTS_PROMPT"
+        echo "notes_model=$MINUTA_NOTES_MODEL"
+        echo "notes_provider=$MINUTA_NOTES_PROVIDER"
+        echo "whisper_device=$MINUTA_DEVICE"
+        echo "diarize=$MINUTA_DIARIZE"
+        echo "speakers=$MINUTA_SPEAKERS"
+        echo "beam=$MINUTA_BEAM"
+        echo "threads=$MINUTA_THREADS"
+        echo "normalize=$MINUTA_NORMALIZE"
+        echo "prompt=$MINUTA_PROMPT"
         return 0
     fi
     [[ " $CONFIG_KEYS " == *" $key "* ]] || die "unknown setting: $key ($CONFIG_KEYS)"
     if [[ $# -eq 0 && -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
-        trello_list)    [[ -z "$val" || "$val" =~ ^[A-Za-z0-9]{8,40}$ ]] || die "not a Trello list id (see: meetinginsights trello lists <board-id>)" ;;
+        trello_list)    [[ -z "$val" || "$val" =~ ^[A-Za-z0-9]{8,40}$ ]] || die "not a Trello list id (see: minuta trello lists <board-id>)" ;;
         trello_list_name) val="$(echo "$val" | tr '\n\r' '  ' | cut -c1-80)" ;;
         obsidian_vault) val="${val/#\~/$HOME}"; [[ -z "$val" || -d "$val" ]] || die "not a folder: $val" ;;
         obsidian_folder) [[ "$val" != /* && "$val" != *..* ]] || die "use a path inside the vault, like Meetings or Clients/{client}/Meetings" ;;
@@ -642,7 +657,7 @@ cmd_config() {
 }
 
 cmd_search() { # search [--client NAME] words...   (a quoted phrase must match as written)
-    [[ $# -gt 0 ]] || die "usage: meetinginsights search [--client NAME] <words...>"
+    [[ $# -gt 0 ]] || die "usage: minuta search [--client NAME] <words...>"
     "$(command -v python3)" "$PREFIX/lib/search.py" "$OUT_DIR" "$DATA_DIR/rec" "$@"
 }
 
@@ -659,7 +674,7 @@ PYEOF
 
 cmd_language() {
     if [[ $# -eq 0 ]]; then
-        echo "setting: $(head -n1 "$LANG_FILE" 2>/dev/null || echo system)  (in use: $MEETINGINSIGHTS_LANGUAGE)"
+        echo "setting: $(head -n1 "$LANG_FILE" 2>/dev/null || echo system)  (in use: $MINUTA_LANGUAGE)"
         return 0
     fi
     [[ "$1" =~ ^(system|auto|[a-z]{2,3})$ ]] || die "invalid language: $1 (use system, auto, or a code like pt, en)"
@@ -689,7 +704,7 @@ cmd_reprocess() {
     title=$(_meeting_title "$name")
     if [[ "$mode" != "--notes-only" ]]; then
         [[ -s "$base.wav" ]] || die "the audio for this meeting was not kept: $base.wav"
-        echo "Transcribing again (model: $WHISPER_MODEL, language: $MEETINGINSIGHTS_LANGUAGE)..."
+        echo "Transcribing again (model: $WHISPER_MODEL, language: $MINUTA_LANGUAGE)..."
         "$PY" "$PREFIX/lib/transcribe.py" "$base.wav" "$base.txt.new" \
             "$WHISPER_MODEL" "$YOU_LABEL" "$THEM_LABEL" || true
         [[ -s "$base.txt.new" ]] || { rm -f "$base.txt.new"; die "no speech was recognised; the old transcript was kept"; }
@@ -704,7 +719,7 @@ cmd_reprocess() {
 cmd_rename() {
     local name="${1:-}" new="${2:-}"
     _valid_name "$name"
-    [[ -n "$new" ]] || die "usage: meetinginsights rename <name> <new title>"
+    [[ -n "$new" ]] || die "usage: minuta rename <name> <new title>"
     local slug prefix newname
     slug=$(echo "$new" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
     slug="${slug:-meeting}"
@@ -730,7 +745,7 @@ cmd_rename() {
 cmd_import() {
     _parse_meta_flags "$@"
     local file="${POS[0]:-}" title="${POS[1]:-}"
-    [[ -f "$file" ]] || die "usage: meetinginsights import <audio-or-video-file> [title]"
+    [[ -f "$file" ]] || die "usage: minuta import <audio-or-video-file> [title]"
     need ffmpeg; check_ready
     [[ -n "$title" ]] || title="$(basename "${file%.*}")"
     local slug ts base
@@ -761,11 +776,11 @@ cmd_export() {
     shift 2 2>/dev/null || true
     for a in "$@"; do [[ "$a" == "--no-transcript" ]] && flag="--no-transcript" || dest="$a"; done
     _valid_name "$name"
-    [[ "$fmt" =~ ^(md|docx|pdf)$ ]] || die "usage: meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]"
+    [[ "$fmt" =~ ^(md|docx|pdf)$ ]] || die "usage: minuta export <name> <md|docx|pdf> [file] [--no-transcript]"
     [[ -n "$dest" ]] || dest="$OUT_DIR/exports/$name.$fmt"
     "$PY" -c 'import docx, reportlab' 2>/dev/null || {
         echo "Installing the export libraries..." >&2
-        "$DATA_DIR/venv/bin/pip" install -q python-docx reportlab >/dev/null 2>&1 \
+        "$DATA_DIR/venv/bin/python" -m pip install -q python-docx reportlab >/dev/null 2>&1 \
             || die "could not install python-docx and reportlab"
     }
     local lang=en
@@ -783,10 +798,10 @@ cmd_obsidian() { # obsidian <name> [--folder PATH] [--no-transcript]
             *) name="$1"; shift ;;
         esac
     done
-    [[ -n "$name" ]] || die "usage: meetinginsights obsidian <name> [--folder PATH] [--no-transcript]"
+    [[ -n "$name" ]] || die "usage: minuta obsidian <name> [--folder PATH] [--no-transcript]"
     _valid_name "$name"
     local vault; vault="$(cfg_get obsidian_vault "")"; vault="${vault/#\~/$HOME}"
-    [[ -n "$vault" ]] || die "no vault set: meetinginsights config obsidian_vault ~/path/to/vault"
+    [[ -n "$vault" ]] || die "no vault set: minuta config obsidian_vault ~/path/to/vault"
     local lang=en; case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in pt*) lang=pt ;; esac
     "$(command -v python3)" "$PREFIX/lib/obsidian.py" "$name" "$OUT_DIR" "$DATA_DIR/rec" "$vault" \
         "$(cfg_get obsidian_folder Meetings)" "$CLIENTS_DIR" "$lang" "$with" "$folder"
@@ -810,11 +825,11 @@ cmd_trello() { # trello login|logout|status|boards|lists <board>|use <list-id> [
             fi
             printf '%s\n%s\n' "$key" "$token" | "${run[@]}" login "$OUT_DIR" "$DATA_DIR/rec" "$cdir" ;;
         logout|status|boards) "${run[@]}" "$sub" "$OUT_DIR" "$DATA_DIR/rec" "$cdir" ;;
-        lists)   [[ -n "${1:-}" ]] || die "usage: meetinginsights trello lists <board-id>"
+        lists)   [[ -n "${1:-}" ]] || die "usage: minuta trello lists <board-id>"
                  "${run[@]}" lists "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$1" ;;
-        use)     [[ -n "${1:-}" ]] || die "usage: meetinginsights trello use <list-id> [name]"
+        use)     [[ -n "${1:-}" ]] || die "usage: minuta trello use <list-id> [name]"
                  cmd_config trello_list "$1" >/dev/null && cmd_config trello_list_name "${2:-}" >/dev/null && echo "cards will go to: ${2:-$1}" ;;
-        actions) [[ -n "${1:-}" ]] || die "usage: meetinginsights trello actions <name>"; _valid_name "$1"
+        actions) [[ -n "${1:-}" ]] || die "usage: minuta trello actions <name>"; _valid_name "$1"
                  "${run[@]}" actions "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$1" ;;
         send)
             local name="" only="" list="" dry=0
@@ -826,11 +841,11 @@ cmd_trello() { # trello login|logout|status|boards|lists <board>|use <list-id> [
                     *) name="$1"; shift ;;
                 esac
             done
-            [[ -n "$name" ]] || die "usage: meetinginsights trello send <name> [--only 1,3] [--list ID] [--dry-run]"
+            [[ -n "$name" ]] || die "usage: minuta trello send <name> [--only 1,3] [--list ID] [--dry-run]"
             _valid_name "$name"
             [[ -n "$list" ]] || list="$(cfg_get trello_list "")"
             "${run[@]}" send "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$name" "$list" "$only" "$dry" ;;
-        *) die "usage: meetinginsights trello login|logout|status|boards|lists <board>|use <list-id> [name]|actions <name>|send <name> [--only 1,3] [--list ID] [--dry-run]" ;;
+        *) die "usage: minuta trello login|logout|status|boards|lists <board>|use <list-id> [name]|actions <name>|send <name> [--only 1,3] [--list ID] [--dry-run]" ;;
     esac
 }
 
@@ -864,7 +879,7 @@ case "${1:-}" in
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
-    notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
+    notes)  shift; [[ $# -ge 1 ]] || die "usage: minuta notes <transcript.txt>"; cmd_notes "$@" ;;
     -h|--help|help|"") sed -n "3,30p" "$0" | sed 's/^# \?//' ;;
-    *) die "unknown command: $1 (try: meetinginsights help)" ;;
+    *) die "unknown command: $1 (try: minuta help)" ;;
 esac
