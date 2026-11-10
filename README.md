@@ -35,7 +35,7 @@ is one) and summarised by a small local model through
 | Questions, decisions, action items | pattern rules over the transcript (Portuguese and English) |
 | Action-item owners | the speaker labels |
 | **In focus** section | keyword match of your focus against the transcript |
-| Prose summary | a small local language model, or Claude Code / Gemini CLI if you opt in |
+| Prose summary | a local language model (small or medium), or Claude Code / Gemini CLI if you opt in |
 
 **Why the speakers are reliable.** Your microphone is recorded to the left channel and
 everything you hear to the right, and each channel is transcribed separately, so "You" is
@@ -46,8 +46,10 @@ is never asked who committed to what, so it cannot invent a participant.
 **Why a tiny model is enough.** Structure, classification and attribution are done in
 code, and the model only writes short prose summaries. In testing, moving classification
 out of the model and into rules fixed every misclassification and cut runtime by ~75%.
-For richer summaries, switch the note writer to Claude Code or Gemini CLI (see
-[Privacy](#privacy)).
+For richer summaries, choose the **medium** local model (3B: it also writes a short
+overview at the top, and writes in the language of the meeting; about 4× slower on a CPU,
+roughly 5 minutes for an 11-minute meeting on 8 cores), or switch the note writer to
+Claude Code or Gemini CLI (see [Privacy](#privacy)).
 
 ## Requirements
 
@@ -56,7 +58,7 @@ For richer summaries, switch the note writer to Claude Code or Gemini CLI (see
   GPU the installer adds the CUDA libraries and uses `large-v3-turbo`, which is several
   times faster (a 62-second recording takes about 4 s after the model loads).
 - Disk: ~1.5 GB for the base models, plus ~1.6 GB for `large-v3-turbo` and ~46 MB for the
-  diarization model, all downloaded once. About 650 MB of RAM while writing notes.
+  diarization model, all downloaded once. About 650 MB of RAM while writing notes with the small model, about 3 GB with the medium one.
 
 ## Install
 
@@ -142,6 +144,7 @@ Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
 | Transcription model | `small`, `medium`, `large-v3-turbo` | `large-v3-turbo` with GPU libraries, else `small` |
 | Processor | `auto` (GPU when usable), `cpu` | `auto` |
 | Who writes the notes | `local`, `claude-code`, `gemini-cli` | `local` |
+| Local summary model | `notes_model`: `small` (0.5B, 0.5 GB) or `medium` (3B, 2 GB) | `small` |
 | Tell voices apart | `diarize` on/off, `speakers` 0 (auto) to 8 | on |
 | Initial prompt | names and jargon to help spelling (`prompt`, up to 500 characters) | empty |
 | Accuracy | `beam` 1 (fast) to 10 | 5 |

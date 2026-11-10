@@ -85,8 +85,15 @@ resolve_language() {
     echo "${l,,}"
 }
 export MEETINGINSIGHTS_LANGUAGE="$(resolve_language)"
-LLM_MODEL="${MEETINGINSIGHTS_LLM_MODEL:-$DATA_DIR/models/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
-LLM_URL="https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+# Size of the local model that writes the summaries: small (0.5B, 0.5 GB, any machine)
+# or medium (3B, 2 GB, noticeably better prose; needs ~3 GB of free RAM).
+export MEETINGINSIGHTS_NOTES_MODEL="${MEETINGINSIGHTS_NOTES_MODEL:-$(cfg_get notes_model small)}"
+case "$MEETINGINSIGHTS_NOTES_MODEL" in
+    medium) _llm_file=qwen2.5-3b-instruct-q4_k_m.gguf; _llm_repo=Qwen2.5-3B-Instruct-GGUF ;;
+    *)      _llm_file=qwen2.5-0.5b-instruct-q4_k_m.gguf; _llm_repo=Qwen2.5-0.5B-Instruct-GGUF ;;
+esac
+LLM_MODEL="${MEETINGINSIGHTS_LLM_MODEL:-$DATA_DIR/models/$_llm_file}"
+LLM_URL="https://huggingface.co/Qwen/$_llm_repo/resolve/main/$_llm_file"
 case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     pt*) _you=Você; _them=Participantes ;;
     *)   _you=You;  _them=Participants ;;
@@ -555,12 +562,13 @@ cmd_notes() {
     return 1
 }
 
-CONFIG_KEYS="whisper_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
+CONFIG_KEYS="whisper_model notes_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
 cmd_config() {
     local key="${1:-}"; shift || true
     local val="$*"
     if [[ -z "$key" ]]; then
         echo "whisper_model=$WHISPER_MODEL"
+        echo "notes_model=$MEETINGINSIGHTS_NOTES_MODEL"
         echo "notes_provider=$MEETINGINSIGHTS_NOTES_PROVIDER"
         echo "whisper_device=$MEETINGINSIGHTS_DEVICE"
         echo "diarize=$MEETINGINSIGHTS_DIARIZE"
@@ -574,6 +582,7 @@ cmd_config() {
     [[ " $CONFIG_KEYS " == *" $key "* ]] || die "unknown setting: $key ($CONFIG_KEYS)"
     if [[ $# -eq 0 && -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
+        notes_model)    [[ "$val" =~ ^(small|medium)$ ]] || die "notes_model must be small or medium" ;;
         notes_provider) [[ "$val" =~ ^(local|claude-code|gemini-cli)$ ]] || die "notes_provider must be local, claude-code or gemini-cli" ;;
         whisper_model)  [[ "$val" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid model name: $val" ;;
         whisper_device) [[ "$val" =~ ^(auto|cpu)$ ]] || die "whisper_device must be auto or cpu" ;;

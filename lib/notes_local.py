@@ -21,7 +21,9 @@ from pathlib import Path
 LLAMA_DIR = Path(os.environ.get(
     "MEETINGINSIGHTS_LLAMA_DIR", Path.home() / ".local/share/meetinginsights/llama"))
 LLAMA_BIN = LLAMA_DIR / "llama"
-THREADS = "6"
+THREADS = os.environ.get("MEETINGINSIGHTS_THREADS", "0")
+if not THREADS.isdigit() or int(THREADS) < 1:
+    THREADS = str(min(os.cpu_count() or 4, 8))
 
 
 def _ui_lang() -> str:
@@ -173,12 +175,46 @@ def focus_turns(turns, focus: str, limit: int = 8):
     return [t for _, t in sorted(hits[:limit], key=lambda x: turns.index(x[1]))]
 
 
-def summarize_chunk(model, turns, focus: str = "") -> str:
+_PT_HINTS = {"que", "não", "nao", "para", "pra", "com", "uma", "você", "voce", "está", "isso", "então",
+             "entao", "também", "vamos", "mas", "como", "ele", "ela", "nós", "gente", "né", "tá", "sim"}
+_EN_HINTS = {"the", "and", "is", "that", "we", "you", "this", "with", "for", "it", "are", "have", "will", "of", "to"}
+
+
+def detect_language(turns) -> str:
+    """'Brazilian Portuguese' or 'English', from common words; the summary should match the meeting."""
+    words = re.findall(r"[\wÀ-ÿ]+", " ".join(t["text"] for t in turns).lower())
+    pt = sum(w in _PT_HINTS for w in words)
+    en = sum(w in _EN_HINTS for w in words)
+    return "Brazilian Portuguese" if pt > en else "English"
+
+
+def is_big_model(model: str) -> bool:
+    try:
+        return Path(model).stat().st_size > 1_000_000_000
+    except OSError:
+        return False
+
+
+def overview(model, summaries, language: str, focus: str = "") -> str:
+    """Two or three sentences that tie the per-part summaries together (bigger models only)."""
+    body = "  ".join(s for _, s in summaries)
+    sys_p = (f"Write a short overview of a meeting in {language}, in 2 or 3 sentences, from these "
+             "notes of its parts. State the main topic, what was decided or agreed, and what is "
+             "left open. Use only what the notes say; do not add names, numbers or facts.")
+    if focus:
+        sys_p += f" The reader mostly cares about: {focus}."
+    out = chat(model, sys_p, body, 160).strip().replace("\n", " ")
+    return out if len(out) > 40 else ""
+
+
+def summarize_chunk(model, turns, focus: str = "", language: str = "") -> str:
     # single line: the CLI echoes the prompt, and a multi-line echo would be
     # mistaken for the model's reply by the output parser
     body = "  ".join(f'{t["speaker"]} {T("said")}: {t["text"]}' for t in turns)
     sys_p = ("Summarize this part of a meeting in ONE factual sentence. "
              "Use only what is stated. Do not add names or facts that are not present.")
+    if language:
+        sys_p += f" Write the sentence in {language}."
     if focus:
         sys_p += f" The reader mostly cares about: {focus}. Mention it if this part touches it."
     s = chat(model, sys_p, body, 90).strip()
@@ -219,12 +255,18 @@ def main() -> int:
             print("llama binary not found", file=sys.stderr)
             return 2
         chunks = chunk(turns)
+        language = detect_language(turns)
         print(f"{len(turns)} turns, {len(chunks)} chunks, model={Path(model).name}", file=sys.stderr)
         for i, ch in enumerate(chunks, 1):
             print(f"  summarizing chunk {i}/{len(chunks)}", file=sys.stderr)
-            s = summarize_chunk(model, ch, focus)
+            s = summarize_chunk(model, ch, focus, language)
             if s:
                 summaries.append((ch[0]["t"], s))
+        if len(summaries) >= 2 and is_big_model(model):
+            print("  writing the overview", file=sys.stderr)
+            ov = overview(model, summaries, language, focus)
+            if ov:
+                summaries.insert(0, (turns[0]["t"], f"**{ov}**"))
         buckets = {c: [] for c in CLASSES}
         substantive = [t for t in turns if len(t["text"].split()) >= 4]
         for t in substantive:

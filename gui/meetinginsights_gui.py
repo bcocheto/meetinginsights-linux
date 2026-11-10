@@ -102,6 +102,12 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Local model: small (0.5 GB, fast)": "Modelo local: pequeno (0,5 GB, rápido)",
+        "Local model: medium (2 GB, better summaries)": "Modelo local: médio (2 GB, resumos melhores)",
+        "Used when the notes are written on this computer. The medium model "
+        "downloads ~2 GB once and needs about 3 GB of free memory.":
+            "Usado quando a ata é escrita neste computador. O modelo médio baixa ~2 GB uma vez "
+            "e precisa de cerca de 3 GB de memória livre.",
         "A recording was left unfinished": "Há uma gravação não concluída",
         "The audio was saved. Process it now to get the transcript and notes?":
             "O áudio foi salvo. Processar agora para obter a transcrição e a ata?",
@@ -1428,6 +1434,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
 
         # ---- notes writer
         box.pack_start(heading("Who writes the notes"), False, False, 0)
+        current_notes_model = self._cfg("notes_model", "small")
+        notes_model_box = combo([("small", "Local model: small (0.5 GB, fast)"),
+                                 ("medium", "Local model: medium (2 GB, better summaries)")],
+                                current_notes_model, "small")
+        box.pack_start(notes_model_box, False, False, 0)
+        box.pack_start(note("Used when the notes are written on this computer. The medium model "
+                            "downloads ~2 GB once and needs about 3 GB of free memory."), False, False, 0)
         current_provider = self._cfg("notes_provider", "local")
         radios, group = {}, None
         for key, label in self.PROVIDERS:
@@ -1460,6 +1473,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             "beam": beam_box.get_active_id() or "5",
             "normalize": "on" if norm_sw.get_active() else "off",
             "threads": str(int(threads.get_value())),
+            "notes_model": notes_model_box.get_active_id() or current_notes_model,
             "notes_provider": next((k for k, rb in radios.items() if rb.get_active()), "local"),
         }
         d.destroy()
@@ -1470,7 +1484,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             if r.returncode != 0:
                 self.error_dialog(T("Could not save the settings"), r.stderr or r.stdout)
                 return
-        if new["whisper_model"] != current_model or (new["diarize"] == "on" and not current_diarize):
+        if (new["whisper_model"] != current_model or new["notes_model"] != current_notes_model
+                or (new["diarize"] == "on" and not current_diarize)):
             self.run_setup()        # downloads the speech / speaker models when they are missing
 
     # ---------- helpers ----------
