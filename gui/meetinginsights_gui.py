@@ -6,6 +6,7 @@ reads the resulting markdown from the notes directory. Everything — recording,
 transcription and note writing — happens on this machine; nothing is uploaded.
 """
 import html
+import json
 import os
 import queue
 import re
@@ -104,6 +105,24 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Send action items to Trello…": "Enviar itens de ação ao Trello…", "Trello: choose the list…": "Trello: escolher a lista…",
+        "Connect to Trello": "Conectar ao Trello", "Connect": "Conectar", "Open the Trello page": "Abrir a página do Trello",
+        "API key": "Chave de API", "Token": "Token",
+        "Create an API key and a token on Trello's page for developers, and paste them here. "
+        "They are kept in a file only you can read. Nothing is sent to Trello until you "
+        "send action items.":
+            "Crie uma chave de API e um token na página de desenvolvedores do Trello e cole aqui. Eles ficam "
+            "num arquivo que só você lê. Nada é enviado ao Trello até você enviar itens de ação.",
+        "Could not connect to Trello": "Não foi possível conectar ao Trello", "Trello": "Trello",
+        "No boards found on this account.": "Nenhum quadro encontrado nesta conta.",
+        "Where should the cards go?": "Para onde vão os cartões?", "Board": "Quadro", "List": "Lista",
+        "This meeting has no action items.": "Esta reunião não tem itens de ação.",
+        "Send action items to Trello": "Enviar itens de ação ao Trello", "Create cards": "Criar cartões",
+        "Cards will be created in “{list}”. The text of the checked items and the "
+        "meeting title are sent to Trello.":
+            "Os cartões serão criados em “{list}”. O texto dos itens marcados e o título da reunião são enviados ao Trello.",
+        "already sent": "já enviado", "{n} cards created.": "{n} cartões criados.",
+        "Some cards were not created": "Alguns cartões não foram criados", "Trello: {title}": "Trello: {title}",
         "Obsidian note": "Nota no Obsidian", "Choose the Obsidian vault…": "Escolher o vault do Obsidian…",
         "Choose the Obsidian vault": "Escolher o vault do Obsidian", "Select": "Selecionar",
         "Could not export to Obsidian": "Não foi possível exportar para o Obsidian",
@@ -1066,8 +1085,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         return ready
 
     # ---------- state ----------
-    def cli(self, *args, timeout=900):
-        return subprocess.run([CLI, *args], capture_output=True, text=True, timeout=timeout)
+    def cli(self, *args, timeout=900, input=None):
+        return subprocess.run([CLI, *args], capture_output=True, text=True, timeout=timeout, input=input)
 
     # ---------- background jobs: transcribing and writing notes never block the window ----------
     def submit_job(self, label, args, on_done):
@@ -1485,6 +1504,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         pick = Gtk.MenuItem(label=T("Choose the Obsidian vault…"))
         pick.connect("activate", lambda *_: self.pick_vault())
         menu.append(pick)
+        menu.append(Gtk.SeparatorMenuItem())
+        tr = Gtk.MenuItem(label=T("Send action items to Trello…"))
+        tr.connect("activate", lambda *_: self.on_trello())
+        menu.append(tr)
+        trl = Gtk.MenuItem(label=T("Trello: choose the list…"))
+        trl.connect("activate", lambda *_: self.trello_pick_list())
+        menu.append(trl)
         menu.show_all()
         menu.popup_at_widget(self.action_btns[4], Gdk.Gravity.SOUTH_WEST, Gdk.Gravity.NORTH_WEST, None)
 
@@ -1515,6 +1541,125 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             return
         lines = r.stdout.strip().splitlines()
         self.notify(T("Saved in Obsidian"), Path(lines[0]).name if lines else "")
+
+    # ---------- Trello: action items to cards (opt-in; sends the chosen text to Trello) ----------
+    def trello_connect(self):
+        d = Gtk.Dialog(title=T("Connect to Trello"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Connect"), Gtk.ResponseType.OK)
+        area = d.get_content_area(); area.set_spacing(8)
+        for m in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(area.props, m, 14)
+        info = Gtk.Label(label=T("Create an API key and a token on Trello's page for developers, and paste them here. "
+                                 "They are kept in a file only you can read. Nothing is sent to Trello until you "
+                                 "send action items."), xalign=0, wrap=True)
+        info.set_max_width_chars(60)
+        area.pack_start(info, False, False, 0)
+        page = Gtk.Button(label=T("Open the Trello page"))
+        page.connect("clicked", lambda *_: subprocess.Popen(
+            ["xdg-open", "https://trello.com/power-ups/admin"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+        area.pack_start(page, False, False, 0)
+        key = Gtk.Entry(); key.set_placeholder_text(T("API key"))
+        token = Gtk.Entry(); token.set_placeholder_text(T("Token")); token.set_visibility(False)
+        area.pack_start(key, False, False, 0); area.pack_start(token, False, False, 0)
+        d.show_all()
+        resp = d.run(); k, t = key.get_text().strip(), token.get_text().strip(); d.destroy()
+        if resp != Gtk.ResponseType.OK or not (k and t):
+            return False
+        r = self.cli("trello", "login", input=f"{k}\n{t}\n", timeout=60)      # through stdin, never as arguments
+        if r.returncode != 0:
+            self.error_dialog(T("Could not connect to Trello"), r.stderr or r.stdout)
+            return False
+        return True
+
+    def trello_pick_list(self):
+        if self.cli("trello", "status", timeout=60).returncode != 0 and not self.trello_connect():
+            return False
+        boards = [ln.split("\t", 1) for ln in self.cli("trello", "boards", timeout=60).stdout.splitlines() if "\t" in ln]
+        if not boards:
+            self.error_dialog(T("Trello"), T("No boards found on this account."))
+            return False
+        d = Gtk.Dialog(title=T("Where should the cards go?"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Select"), Gtk.ResponseType.OK)
+        area = d.get_content_area(); area.set_spacing(8)
+        for m in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(area.props, m, 14)
+        bbox, lbox = Gtk.ComboBoxText(), Gtk.ComboBoxText()
+        for bid, name in boards:
+            bbox.append(bid, name)
+
+        def load_lists(*_):
+            lbox.remove_all()
+            bid = bbox.get_active_id()
+            if bid:
+                for ln in self.cli("trello", "lists", bid, timeout=60).stdout.splitlines():
+                    if "\t" in ln:
+                        lid, name = ln.split("\t", 1); lbox.append(lid, name)
+                lbox.set_active(0)
+        bbox.connect("changed", load_lists)
+        area.pack_start(Gtk.Label(label=T("Board"), xalign=0), False, False, 0); area.pack_start(bbox, False, False, 0)
+        area.pack_start(Gtk.Label(label=T("List"), xalign=0), False, False, 0); area.pack_start(lbox, False, False, 0)
+        bbox.set_active(0)
+        d.show_all()
+        resp = d.run(); lid, lname = lbox.get_active_id(), lbox.get_active_text(); d.destroy()
+        if resp != Gtk.ResponseType.OK or not lid:
+            return False
+        r = self.cli("trello", "use", lid, lname or "")
+        if r.returncode != 0:
+            self.error_dialog(T("Trello"), r.stderr or r.stdout)
+            return False
+        return True
+
+    def on_trello(self):
+        if not self.selected:
+            return
+        name = self.selected.stem
+        if self.cli("trello", "status", timeout=60).returncode != 0 and not self.trello_connect():
+            return
+        if not self._cfg("trello_list", "") and not self.trello_pick_list():
+            return
+        r = self.cli("trello", "actions", name)
+        try:
+            acts = json.loads(r.stdout)
+        except ValueError:
+            self.error_dialog(T("Trello"), (r.stderr or r.stdout)[-400:])
+            return
+        if not acts:
+            self.error_dialog(T("Trello"), T("This meeting has no action items."))
+            return
+        d = Gtk.Dialog(title=T("Send action items to Trello"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Create cards"), Gtk.ResponseType.OK)
+        area = d.get_content_area(); area.set_spacing(6)
+        for m in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(area.props, m, 14)
+        target = self._cfg("trello_list_name", "") or self._cfg("trello_list", "")
+        head = Gtk.Label(label=T("Cards will be created in “{list}”. The text of the checked items and the "
+                                 "meeting title are sent to Trello.", list=target), xalign=0, wrap=True)
+        head.set_max_width_chars(70)
+        area.pack_start(head, False, False, 0)
+        checks = []
+        for a in acts:
+            label = (f"{a['owner']}: " if a.get("owner") else "") + a["text"]
+            cb = Gtk.CheckButton(label=label + (f"  ({T('already sent')})" if a.get("sent") else ""))
+            cb.get_child().set_line_wrap(True); cb.get_child().set_max_width_chars(80)
+            cb.set_active(not a.get("sent")); cb.set_sensitive(not a.get("sent"))
+            area.pack_start(cb, False, False, 0); checks.append((a["i"], cb))
+        d.show_all()
+        resp = d.run()
+        chosen = [str(i) for i, cb in checks if cb.get_active() and cb.get_sensitive()]
+        d.destroy()
+        if resp != Gtk.ResponseType.OK or not chosen:
+            return
+
+        def done(res):
+            made = res.stdout.count("created:")
+            if res.returncode == 0:
+                self.notify(T("Trello"), T("{n} cards created.", n=made))
+            else:
+                self.error_dialog(T("Some cards were not created"), (res.stderr or res.stdout)[-500:])
+        self.submit_job(T("Trello: {title}", title=name[17:] or name), ("trello", "send", name, "--only", ",".join(chosen)), done)
 
     def on_export(self, ext):
         if not self.selected:

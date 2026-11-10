@@ -7,6 +7,7 @@
 #   meetinginsights stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
 #                                             recording; finish later with: meetinginsights finish <name>)
 #   meetinginsights status                    show whether a recording is running
+#   meetinginsights trello login|boards|lists|use|send   send a meeting's action items to Trello cards
 #   meetinginsights obsidian <name> [--folder P]   save a meeting as a note in your Obsidian vault
 #   meetinginsights search [--client NAME] words   find meetings by what was said, in notes and transcripts
 #   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
@@ -596,12 +597,13 @@ cmd_notes() {
     return 1
 }
 
-CONFIG_KEYS="obsidian_vault obsidian_folder whisper_model notes_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
+CONFIG_KEYS="trello_list trello_list_name obsidian_vault obsidian_folder whisper_model notes_model notes_provider whisper_device diarize speakers prompt beam threads normalize"
 cmd_config() {
     local key="${1:-}"; shift || true
     local val="$*"
     if [[ -z "$key" ]]; then
         echo "whisper_model=$WHISPER_MODEL"
+        echo "trello_list=$(cfg_get trello_list "") ($(cfg_get trello_list_name ""))"
         echo "obsidian_vault=$(cfg_get obsidian_vault "")"
         echo "obsidian_folder=$(cfg_get obsidian_folder Meetings)"
         echo "notes_model=$MEETINGINSIGHTS_NOTES_MODEL"
@@ -618,6 +620,8 @@ cmd_config() {
     [[ " $CONFIG_KEYS " == *" $key "* ]] || die "unknown setting: $key ($CONFIG_KEYS)"
     if [[ $# -eq 0 && -z "$val" ]]; then cfg_get "$key" ""; return 0; fi
     case "$key" in
+        trello_list)    [[ -z "$val" || "$val" =~ ^[A-Za-z0-9]{8,40}$ ]] || die "not a Trello list id (see: meetinginsights trello lists <board-id>)" ;;
+        trello_list_name) val="$(echo "$val" | tr '\n\r' '  ' | cut -c1-80)" ;;
         obsidian_vault) val="${val/#\~/$HOME}"; [[ -z "$val" || -d "$val" ]] || die "not a folder: $val" ;;
         obsidian_folder) [[ "$val" != /* && "$val" != *..* ]] || die "use a path inside the vault, like Meetings or Clients/{client}/Meetings" ;;
         notes_model)    [[ "$val" =~ ^(small|medium)$ ]] || die "notes_model must be small or medium" ;;
@@ -788,6 +792,48 @@ cmd_obsidian() { # obsidian <name> [--folder PATH] [--no-transcript]
         "$(cfg_get obsidian_folder Meetings)" "$CLIENTS_DIR" "$lang" "$with" "$folder"
 }
 
+cmd_trello() { # trello login|logout|status|boards|lists <board>|use <list-id> [name]|actions <name>|send <name> [...]
+    local sub="${1:-}"; shift || true
+    local py; py="$(command -v python3)"
+    local run=("$py" "$PREFIX/lib/trello.py")
+    local cdir; cdir="$(dirname "$CONFIG_FILE")"
+    case "$sub" in
+        login)
+            # the key and token go in through stdin, never through arguments (those show up in `ps`)
+            local key token
+            if [[ -t 0 ]]; then
+                echo "Create an API key at https://trello.com/power-ups/admin (New, then API key) and, on the"
+                echo "same page, 'Token' to authorize it. Both are stored in a file only you can read."
+                read -r -p "API key: " key; read -r -s -p "Token (hidden): " token; echo
+            else
+                read -r key; read -r token
+            fi
+            printf '%s\n%s\n' "$key" "$token" | "${run[@]}" login "$OUT_DIR" "$DATA_DIR/rec" "$cdir" ;;
+        logout|status|boards) "${run[@]}" "$sub" "$OUT_DIR" "$DATA_DIR/rec" "$cdir" ;;
+        lists)   [[ -n "${1:-}" ]] || die "usage: meetinginsights trello lists <board-id>"
+                 "${run[@]}" lists "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$1" ;;
+        use)     [[ -n "${1:-}" ]] || die "usage: meetinginsights trello use <list-id> [name]"
+                 cmd_config trello_list "$1" >/dev/null && cmd_config trello_list_name "${2:-}" >/dev/null && echo "cards will go to: ${2:-$1}" ;;
+        actions) [[ -n "${1:-}" ]] || die "usage: meetinginsights trello actions <name>"; _valid_name "$1"
+                 "${run[@]}" actions "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$1" ;;
+        send)
+            local name="" only="" list="" dry=0
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --only) only="${2:-}"; shift 2 ;;
+                    --list) list="${2:-}"; shift 2 ;;
+                    --dry-run) dry=1; shift ;;
+                    *) name="$1"; shift ;;
+                esac
+            done
+            [[ -n "$name" ]] || die "usage: meetinginsights trello send <name> [--only 1,3] [--list ID] [--dry-run]"
+            _valid_name "$name"
+            [[ -n "$list" ]] || list="$(cfg_get trello_list "")"
+            "${run[@]}" send "$OUT_DIR" "$DATA_DIR/rec" "$cdir" "$name" "$list" "$only" "$dry" ;;
+        *) die "usage: meetinginsights trello login|logout|status|boards|lists <board>|use <list-id> [name]|actions <name>|send <name> [--only 1,3] [--list ID] [--dry-run]" ;;
+    esac
+}
+
 cmd_delete() {
     local name="${1:-}"
     _valid_name "$name"
@@ -811,6 +857,7 @@ case "${1:-}" in
     delete) shift; cmd_delete "$@" ;;
     finish) shift; cmd_finish "$@" ;;
     recover) shift; cmd_recover "$@" ;;
+    trello) shift; cmd_trello "$@" ;;
     obsidian) shift; cmd_obsidian "$@" ;;
     search) shift; cmd_search "$@" ;;
     client) shift; cmd_client "$@" ;;
@@ -818,6 +865,6 @@ case "${1:-}" in
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,29p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,30p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac

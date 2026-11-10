@@ -43,6 +43,7 @@ Escrever a ata com o Claude Code ou o Gemini CLI é possível, mas fica desligad
 | 🎯 **Cliente e foco** | Um **glossário** salvo de nomes e termos por cliente, e um **foco** ("o que importa nesta reunião") que ganha uma seção própria, *Em foco*. |
 | 🔊 **Medidores de áudio** | Níveis ao vivo do microfone e do áudio da chamada, com aviso quando um deles fica em silêncio: uma entrada morta é percebida em segundos, não depois da reunião. |
 | 🟣 **Exportação para o Obsidian** | Salve uma reunião como nota no seu vault: frontmatter, transcrição dobrável, link para o hub do cliente e uma linha no índice, para a nota ser alcançável a partir do resto do vault. |
+| 🗒️ **Itens de ação para o Trello** | Transforme os itens de ação de uma reunião em cartões do Trello (responsável, reunião e hora na descrição) com um clique. Opcional: nada é enviado até você escolher os itens. |
 | 🔎 **Busca em tudo** | Encontre uma reunião pelo que foi dito, nas notas *e* na transcrição, ignorando maiúsculas e acentos, e filtre por cliente. O trecho encontrado fica destacado na ata. |
 | 🛟 **Recuperação de falhas** | Uma gravação interrompida (travamento, queda de energia) é concluída na próxima abertura, e áudios que ficaram sem ata são oferecidos para processamento. |
 | 📤 **Exportar e editar** | Renomear, reescrever a ata, transcrever de novo, editar a transcrição, excluir; exportar para Markdown, Word (`.docx`) ou PDF. |
@@ -167,6 +168,7 @@ meetinginsights rename <nome> "Novo título"
 meetinginsights export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
 meetinginsights delete <nome>
 meetinginsights obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian
+meetinginsights trello send <nome> [--only 1,3] [--dry-run]       # itens de ação viram cartões do Trello
 meetinginsights search [--client N] palavras  # encontra reuniões pelo que foi dito
 meetinginsights recover [--list]           # conclui uma gravação interrompida
 ```
@@ -310,6 +312,35 @@ Em inglês, as chaves viram `type: meeting`, `date`, `client` e `participants`.
 - Se o seu vault usa outras convenções de frontmatter, edite as notas depois: o MeetingInsights
   só cria e atualiza o arquivo que ele mesmo gerou.
 
+## Itens de ação para o Trello
+
+Pelo app: **Exportar → Enviar itens de ação ao Trello…**. Na primeira vez, ele pede para conectar
+(uma chave de API e um token) e para escolher o quadro e a lista que vão receber os cartões; depois,
+você marca os itens que quer enviar. Cada cartão leva a ação como título e, na descrição, o
+responsável, a reunião (com a data) e a hora na gravação. Os itens já enviados aparecem marcados e
+nunca são duplicados, mesmo que você envie a reunião de novo.
+
+Pelo terminal:
+
+```sh
+meetinginsights trello login               # pede a chave de API e o token (o token fica oculto)
+meetinginsights trello boards              # id <TAB> nome
+meetinginsights trello lists <id-do-quadro>
+meetinginsights trello use <id-da-lista> "Backlog"
+meetinginsights trello send <nome> --dry-run          # mostra o que seria criado
+meetinginsights trello send <nome> [--only 1,3]       # cria os cartões (todos, ou só as linhas escolhidas)
+meetinginsights trello logout
+```
+
+Crie a chave e o token você mesmo em <https://trello.com/power-ups/admin> (*New*, depois *API key*; a
+mesma página oferece o *Token*). Eles ficam em `~/.config/meetinginsights/trello`, legível só por você,
+viajam no corpo de uma requisição HTTPS (nunca numa URL) e não aparecem na lista de processos. Definir
+`MEETINGINSIGHTS_TRELLO_KEY` e `MEETINGINSIGHTS_TRELLO_TOKEN` mantém os dois fora de qualquer arquivo.
+Os itens já enviados ficam registrados em `~/.local/share/meetinginsights/rec/<nome>.trello`.
+
+**Dica:** para o Trello receber o texto certo, confira a ata antes. Os itens de ação são extraídos
+por regras sobre a transcrição e podem conter falhas de transcrição.
+
 ## Configurações
 
 Abra **Configurações** no app, ou use `meetinginsights config [chave [valor]]` e
@@ -359,6 +390,8 @@ As variáveis de ambiente prevalecem sobre o arquivo de configurações
   tem instalada e autenticada e nunca vê as suas credenciais. As atas escritas assim avisam no
   topo, e o app as marca com um selo de nuvem. Deixe a configuração em `local` para manter
   tudo offline.
+- **Trello (opcional, sob demanda):** só quando você escolhe *Enviar itens de ação ao Trello* o app fala com o
+  Trello, e ele envia apenas o texto dos itens marcados e o título da reunião.
 - **Obsidian:** a exportação só escreve arquivos dentro da pasta do vault que você escolheu.
 
 > **Consentimento para gravar.** Gravar uma conversa sem avisar os outros participantes é
@@ -370,7 +403,7 @@ As variáveis de ambiente prevalecem sobre o arquivo de configurações
 python3 -m unittest discover -s tests
 ```
 
-Cobre a classificação das falas, o foco, a busca, a exportação para o Obsidian, o redator
+Cobre a classificação das falas, o foco, a busca, a exportação para o Obsidian, o Trello (contra um servidor falso local), o redator
 externo, os níveis de áudio, a CLI (glossários, gravações interrompidas, renomeações) e a taxa
 de erro de palavras. Para proteger a qualidade da transcrição ao mexer no pipeline, aponte o
 teste de ponta a ponta para uma gravação e o texto de referência dela:

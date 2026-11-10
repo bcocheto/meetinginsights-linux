@@ -41,6 +41,7 @@ possible, but it is off unless you turn it on.
 | 🎯 **Client and focus** | A saved **glossary** of names and terms per client, and a **focus** ("what matters in this meeting") that gets its own *In focus* section. |
 | 🔊 **Input meters** | Live levels for the microphone and the call audio, with a warning when one of them goes quiet — a dead input is caught in seconds, not after the meeting. |
 | 🟣 **Obsidian export** | Save a meeting as a note in your vault: frontmatter, a foldable transcript, a link back to the client's hub and a line in its index, so the note is reachable from the rest of the vault. |
+| 🗒️ **Action items to Trello** | Turn a meeting's action items into Trello cards (owner, meeting and time in the description) with one click. Opt-in: nothing is sent until you choose items. |
 | 🔎 **Search everything** | Find a meeting by what was said — in the notes *and* the transcript, ignoring case and accents — and filter by client. Matches are highlighted in the notes. |
 | 🛟 **Crash recovery** | A recording cut short (crash, power loss) is finished on the next launch, and audio that never got notes is offered for processing. |
 | 📤 **Export and edit** | Rename, rewrite the notes, transcribe again, edit the transcript, delete; export to Markdown, Word (`.docx`) or PDF. |
@@ -164,6 +165,7 @@ meetinginsights rename <name> "New title"
 meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]
 meetinginsights delete <name>
 meetinginsights obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault
+meetinginsights trello send <name> [--only 1,3] [--dry-run]       # action items to Trello cards
 meetinginsights search [--client N] words  # find meetings by what was said
 meetinginsights recover [--list]           # finish an interrupted recording
 ```
@@ -223,6 +225,32 @@ These are also in the app, under **Glossary**. The index gets one new row if it 
 (matching its columns) or one bullet otherwise, and its `updated:` date is refreshed; a meeting
 already listed is not added twice.
 
+### Action items to Trello
+
+From the app: **Export → Send action items to Trello…**. The first time it asks you to connect
+(an API key and a token) and to choose the board and list that should receive the cards; then you
+tick the action items to send. Each card gets the action as its title and the owner, the meeting
+(with date) and the time in the recording in its description. Items you already sent are marked and
+never duplicated, even if you send the meeting again.
+
+From the terminal:
+
+```sh
+meetinginsights trello login               # asks for the API key and the token (the token is hidden)
+meetinginsights trello boards              # id <TAB> name
+meetinginsights trello lists <board-id>
+meetinginsights trello use <list-id> "Backlog"
+meetinginsights trello send <name> --dry-run          # show what would be created
+meetinginsights trello send <name> [--only 1,3]       # create the cards (all, or the chosen rows)
+meetinginsights trello logout
+```
+
+Create the key and the token yourself on <https://trello.com/power-ups/admin> (*New*, then *API key*;
+the same page offers a *Token*). They are stored in `~/.config/meetinginsights/trello`, readable only by
+you, travel in the body of an HTTPS request (never in a URL) and are never shown in the process list.
+Setting `MEETINGINSIGHTS_TRELLO_KEY` and `MEETINGINSIGHTS_TRELLO_TOKEN` instead keeps them out of any file.
+Which items were already sent is remembered in `~/.local/share/meetinginsights/rec/<name>.trello`.
+
 ## Settings
 
 Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
@@ -266,6 +294,8 @@ Environment variables override the settings file (`~/.config/meetinginsights/con
 - Audio, transcripts and notes stay on your machine, in folders only your user can read.
 - Models are downloaded once, during `setup` (or the first use of a new model). After that
   the transcriber loads them from disk and makes no network calls.
+- **Trello (opt-in, on request):** only when you choose *Send action items to Trello* does the app talk to
+  Trello, and it sends just the text of the items you ticked and the meeting title.
 - **Opt-in exception:** if you pick `claude-code` or `gemini-cli` as the note writer, the
   **transcript is sent to that service** to write the notes. The app uses the CLI you
   already have installed and logged in, and never sees your credentials. Notes written
@@ -281,7 +311,7 @@ Environment variables override the settings file (`~/.config/meetinginsights/con
 python3 -m unittest discover -s tests
 ```
 
-Covers note classification, focus matching, search, the external writer, input levels, the CLI
+Covers note classification, focus matching, search, Obsidian export, Trello (against a local fake server), the external writer, input levels, the CLI
 (glossaries, interrupted recordings, renames) and word error rate. To guard transcription
 quality when you change the pipeline, point the end-to-end test at a recording and its
 reference text:

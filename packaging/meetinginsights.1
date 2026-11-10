@@ -41,6 +41,12 @@ Finish a recording that was cut short and process audio left without minutes.
 .BI "import " file " [title]"
 Transcribe an existing audio or video file and write the minutes.
 .TP
+.B trello " login|logout|status|boards|lists|use|actions|send"
+Turn a meeting's action items into Trello cards. \fBlogin\fR reads an API key and a token (from the
+terminal or standard input) and stores them privately; \fBuse\fR picks the list; \fBsend\fR
+\fIname\fR [\fB--only\fR 1,3] [\fB--dry-run\fR] creates the cards, once per item. Opt-in: nothing
+is sent unless you run \fBsend\fR.
+.TP
 .BI "obsidian " name " [--folder " path "] [--no-transcript]"
 Save a meeting as a note, with frontmatter and the transcript, in the Obsidian vault set with
 \fBconfig obsidian_vault\fR. Per-client folder, hub and index notes are set with
