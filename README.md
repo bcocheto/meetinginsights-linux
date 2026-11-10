@@ -1,39 +1,78 @@
-# MeetingInsights — AI Note Taker for Linux
+<div align="center">
 
-Record a meeting (or import an audio/video file) and get a transcript plus structured
-minutes. Speech recognition and note writing run on your machine: no account, no API key,
-no upload. An external writer for the notes (Claude Code or Gemini CLI) exists, but it is
-off unless you turn it on.
+<img src="icons/256x256/meetinginsights.png" alt="MeetingInsights" width="112">
 
-A GTK desktop app and a CLI. Audio is captured with PulseAudio/PipeWire, transcribed by
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (on the NVIDIA GPU when there
-is one) and summarised by a small local model through
-[llama.cpp](https://github.com/ggml-org/llama.cpp).
+# MeetingInsights
 
-## What you get
+**Record a meeting. Get the transcript and the minutes. Nothing leaves your computer.**
 
-- **Record or import.** Capture the microphone and the call audio together, or drop in a
-  recording (any audio or video file).
-- **Live transcription** while the meeting runs, so stopping is nearly instant. Writing the
-  notes happens in a background queue: the window stays free, and you can start the next
-  recording while the last one is still being processed.
-- **Input meters** for the microphone and the call audio while recording, with a warning if
-  one of them stops picking up sound, so a dead input is caught in seconds, not after the meeting.
-- **Who said what.** You, and each voice on the far end (*Participant 1, 2…*).
-- **Notes**: summary, action items with owners, decisions and open questions, in the
-  language of the meeting (Portuguese and English).
-- **Per-meeting context**: a *client* with a saved glossary of names and terms, and a
-  *focus* ("what matters in this meeting") that gets its own **In focus** section.
-- **Per-meeting actions**: rename, rewrite the notes, transcribe again, edit the
-  transcript, delete; export to Markdown, Word (`.docx`) or PDF.
-- **Crash recovery**: a recording cut short (crash, power loss) is finished on the next
-  launch, and audio that never got notes is offered for processing.
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-004c99)](LICENSE)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-004c99)](#install)
+[![Runs offline](https://img.shields.io/badge/runs-offline-1f8a4c)](#privacy)
+[![GPU optional](https://img.shields.io/badge/GPU-optional-d9731a)](#requirements)
+
+[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Settings](#settings) · [Privacy](#privacy)
+
+<br>
+
+<img src="docs/screenshots/notes.png" alt="Meeting notes in MeetingInsights: summary, what matters, action items" width="860">
+
+</div>
+
+<br>
+
+A Linux desktop app (GTK) and a command-line tool that turn a call into a transcript and
+structured notes — a summary, **action items with owners**, decisions and open questions —
+in the language of the meeting. Speech recognition and note writing run on your machine:
+no account, no API key, no upload. Writing the notes with Claude Code or Gemini CLI is
+possible, but it is off unless you turn it on.
+
+## Features
+
+|  |  |
+|---|---|
+| 🎙️ **Record or import** | Capture the microphone and the call audio together, or drop in any audio or video file. |
+| ⚡ **Live transcription** | The transcript is built while the meeting runs, so stopping is nearly instant. |
+| 🗂️ **Background queue** | Notes are written in the background: the window is free right after **Stop**, and you can start the next recording while the last one is still being processed. |
+| 👥 **Who said what** | *You*, and each voice on the far end (*Participant 1, 2…*). |
+| 📝 **Useful notes** | Summary with an overview, action items with owners, decisions, open questions. Portuguese and English. |
+| 🎯 **Client and focus** | A saved **glossary** of names and terms per client, and a **focus** ("what matters in this meeting") that gets its own *In focus* section. |
+| 🔊 **Input meters** | Live levels for the microphone and the call audio, with a warning when one of them goes quiet — a dead input is caught in seconds, not after the meeting. |
+| 🛟 **Crash recovery** | A recording cut short (crash, power loss) is finished on the next launch, and audio that never got notes is offered for processing. |
+| 📤 **Export and edit** | Rename, rewrite the notes, transcribe again, edit the transcript, delete; export to Markdown, Word (`.docx`) or PDF. |
+| 🧠 **Your choice of writer** | A small local model, a bigger local one, or — opt in — Claude Code / Gemini CLI. |
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/new-meeting.png" alt="New meeting: title, client, focus"><br><sub><b>New meeting</b> — a title, an optional client (with its glossary) and a focus.</sub></td>
+<td width="50%"><img src="docs/screenshots/recording.png" alt="Recording with input meters and live transcript"><br><sub><b>Recording</b> — input meters and a live transcript.</sub></td>
+</tr>
+</table>
 
 ## How it works
 
+```mermaid
+flowchart LR
+    classDef user fill:#d9731a,stroke:#a85510,color:#fff,stroke-width:2.5px
+    classDef front fill:#1f5fb4,stroke:#004c99,color:#fff,stroke-width:2.5px
+    classDef back fill:#004c99,stroke:#00366b,color:#fff,stroke-width:2.5px
+    classDef data fill:#3a7ca5,stroke:#004c99,color:#fff,stroke-width:2.5px
+
+    U([You and the call]):::user --> A[GTK app / CLI]:::front
+    A --> C[Capture<br/>mic left, call right]:::back
+    C --> W[Live transcription<br/>faster-whisper]:::back
+    W --> D[Voices on the far end<br/>sherpa-onnx]:::back
+    D --> R[Rules: actions,<br/>decisions, questions]:::back
+    R --> L[Summary writer<br/>local model or opt-in CLI]:::back
+    C -.-> S[(Audio and<br/>transcripts)]:::data
+    L --> N[(Notes<br/>Markdown)]:::data
+    N --> A
+    linkStyle default stroke:#004c99,stroke-width:2.5px
+```
+
 | Part of the notes | Produced by |
 |---|---|
-| Transcript | faster-whisper, local, GPU when available |
+| Transcript | faster-whisper, local, on the GPU when there is one |
 | "You" vs. the far end | audio routing (separate channels) |
 | *Participant 1, 2…* on the far end | offline speaker diarization (sherpa-onnx) |
 | Questions, decisions, action items | pattern rules over the transcript (Portuguese and English) |
@@ -47,13 +86,13 @@ exact. The far end shares one channel; a diarization model splits it by voice, c
 where the voice changes. Action-item owners are read off those labels. The language model
 is never asked who committed to what, so it cannot invent a participant.
 
-**Why a tiny model is enough.** Structure, classification and attribution are done in
-code, and the model only writes short prose summaries. In testing, moving classification
-out of the model and into rules fixed every misclassification and cut runtime by ~75%.
-For richer summaries, choose the **medium** local model (3B: it also writes a short
-overview at the top, and writes in the language of the meeting; about 4× slower on a CPU,
-roughly 5 minutes for an 11-minute meeting on 8 cores), or switch the note writer to
-Claude Code or Gemini CLI (see [Privacy](#privacy)).
+**Why a tiny model can be enough.** Structure, classification and attribution are done in
+code, and the model only writes the prose. In testing, moving classification out of the
+model and into rules fixed every misclassification and cut runtime by ~75%. For richer
+summaries choose the **medium** local model (3B): it also writes a short overview at the
+top and writes in the language of the meeting, at about 4× the time on a CPU (roughly
+5 minutes for an 11-minute meeting on 8 cores). Like any small model it can still get a
+detail wrong, so read the notes before you share them.
 
 ## Requirements
 
@@ -61,15 +100,17 @@ Claude Code or Gemini CLI (see [Privacy](#privacy)).
 - A GPU is optional. Without one it runs on the CPU with the `small` model; with an NVIDIA
   GPU the installer adds the CUDA libraries and uses `large-v3-turbo`, which is several
   times faster (a 62-second recording takes about 4 s after the model loads).
-- Disk: ~1.5 GB for the base models, plus ~1.6 GB for `large-v3-turbo` and ~46 MB for the
-  diarization model, all downloaded once. About 650 MB of RAM while writing notes with the small model, about 3 GB with the medium one.
+- Disk: ~1.5 GB for the base models, plus ~1.6 GB for `large-v3-turbo`, ~2 GB for the
+  medium summary model and ~46 MB for the diarization model — each downloaded once, only
+  if you use it. About 650 MB of RAM while writing notes with the small model, about 3 GB
+  with the medium one.
 
 ## Install
 
 **Debian / Ubuntu** — the package bundles the llama.cpp runtime, so nothing has to be compiled:
 
 ```sh
-sudo apt install ./meetinginsights_0.1.1_amd64.deb
+sudo apt install ./meetinginsights_<version>_amd64.deb
 meetinginsights setup      # prepares Python and downloads the models, once
 ```
 
@@ -80,7 +121,8 @@ meetinginsights setup      # prepares Python and downloads the models, once
 meetinginsights setup
 ```
 
-The source install needs llama.cpp, built once:
+<details>
+<summary>The source install needs llama.cpp, built once</summary>
 
 ```sh
 git clone --depth 1 https://github.com/ggml-org/llama.cpp
@@ -92,6 +134,7 @@ cp build/bin/llama build/bin/*.so* ~/.local/share/meetinginsights/llama/
 
 Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04 and 22.04 —
 which is why the `.deb` ships its own build.
+</details>
 
 ## Use
 
@@ -116,7 +159,9 @@ meetinginsights recover [--list]           # finish an interrupted recording
 ```
 
 `<name>` is the file stem, e.g. `2026-11-09_14-36_weekly-sync`. Run `meetinginsights help`
-for the full list.
+for the full list. `meetinginsights stop --capture-only` saves the audio in a couple of
+seconds and leaves the rest to `meetinginsights finish <name>`; the app uses this to keep
+the window free.
 
 Notes land in `~/MeetingNotes/`; audio and transcripts in
 `~/.local/share/meetinginsights/rec/`.
@@ -142,6 +187,10 @@ transcriber; use the glossary or the *Initial prompt* setting for that.
 Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
 `meetinginsights language`.
 
+<table>
+<tr>
+<td>
+
 | Setting | Values | Default |
 |---|---|---|
 | Spoken language | `system` (follows the OS), `auto`, or a code such as `pt`, `en` | `system` |
@@ -153,6 +202,11 @@ Open **Settings** in the app, or use `meetinginsights config [key [value]]` and
 | Initial prompt | names and jargon to help spelling (`prompt`, up to 500 characters) | empty |
 | Accuracy | `beam` 1 (fast) to 10 | 5 |
 | Even out volume / threads | `normalize` on/off, `threads` 0 = auto | off / 0 |
+
+</td>
+<td width="260"><img src="docs/screenshots/settings.png" alt="Settings dialog"></td>
+</tr>
+</table>
 
 Environment variables override the settings file (`~/.config/meetinginsights/config`):
 
@@ -173,34 +227,38 @@ Environment variables override the settings file (`~/.config/meetinginsights/con
 - **Opt-in exception:** if you pick `claude-code` or `gemini-cli` as the note writer, the
   **transcript is sent to that service** to write the notes. The app uses the CLI you
   already have installed and logged in, and never sees your credentials. Notes written
-  this way say so at the top. Leave the setting on `local` to keep everything offline.
+  this way say so at the top, and the app marks them with a cloud badge. Leave the setting
+  on `local` to keep everything offline.
 
-## Recording consent
+> **Recording consent.** Recording a conversation without telling the other participants is
+> illegal in many places. `meetinginsights start` prints a reminder; please honour it.
 
-Recording a conversation without telling the other participants is illegal in many places.
-`meetinginsights start` prints a reminder; please honour it.
-
-## Tests
+## Development
 
 ```sh
 python3 -m unittest discover -s tests
 ```
 
-Covers note classification, focus matching, the external writer, the CLI (glossaries,
-interrupted recordings, renames) and word error rate. To guard transcription quality when
-you change the pipeline, point it at a recording and its reference text:
+Covers note classification, focus matching, the external writer, input levels, the CLI
+(glossaries, interrupted recordings, renames) and word error rate. To guard transcription
+quality when you change the pipeline, point the end-to-end test at a recording and its
+reference text:
 
 ```sh
 MI_E2E_AUDIO=talk.wav MI_E2E_REFERENCE=talk.txt MI_E2E_MAX_WER=0.20 \
   ~/.local/share/meetinginsights/venv/bin/python -m unittest tests.test_e2e
 ```
 
+The screenshots in this README are generated from made-up demo data (nothing from real
+meetings): `GDK_BACKEND=x11 python3 packaging/screenshots.py`.
+
 ## Licence
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](LICENSE).
 
 ## Links
 
-- Source: https://github.com/techbysaurabh/meetinginsights-linux
+- Source: https://github.com/bcocheto/meetinginsights-linux
+- Based on https://github.com/techbysaurabh/meetinginsights-linux
 - The iOS sibling, *MeetingInsights: AI Minutes*, is on the App Store — this is the Linux
   counterpart and shares its icon and design language.
