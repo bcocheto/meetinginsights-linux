@@ -1,15 +1,17 @@
 #!/bin/bash
 # meetinginsights — MeetingInsights: AI Note Taker.
 #
-#   meetinginsights start "Sprint planning"   begin recording (microphone + system audio)
+#   meetinginsights start "Sprint planning" [--client NAME] [--focus "what matters"]
+#                                             begin recording (microphone + system audio)
+#   meetinginsights client [list|show|set|rm] NAME [terms...]   per-client glossary for names and terms
 #   meetinginsights stop                      stop, transcribe, write notes
 #   meetinginsights status                    show whether a recording is running
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
 #   meetinginsights setup                     fetch the speech and language models
 #   meetinginsights language [system|auto|pt|en|...]   show or set the spoken language
 #   meetinginsights config [key [value]]     show or set whisper_model, notes_provider, whisper_device
-#   meetinginsights import <audio|video> [title]   transcribe an existing file and write the notes
-#   meetinginsights reprocess <name> [--notes-only]    transcribe again and rewrite the notes
+#   meetinginsights import <audio|video> [title] [--client N] [--focus T]   transcribe an existing file and write the notes
+#   meetinginsights reprocess <name> [--notes-only] [--client N] [--focus T]    transcribe again and rewrite the notes
 #   meetinginsights rename <name> <new title>          rename a meeting
 #   meetinginsights export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
 #   meetinginsights delete <name>                      delete a meeting's notes, transcript and audio
@@ -61,6 +63,7 @@ export MEETINGINSIGHTS_DEVICE="${MEETINGINSIGHTS_DEVICE:-$(cfg_get whisper_devic
 export MEETINGINSIGHTS_DIARIZE="${MEETINGINSIGHTS_DIARIZE:-$(cfg_get diarize on)}"
 export MEETINGINSIGHTS_SPEAKERS="${MEETINGINSIGHTS_SPEAKERS:-$(cfg_get speakers 0)}"
 export MEETINGINSIGHTS_PROMPT="${MEETINGINSIGHTS_PROMPT:-$(cfg_get prompt "")}"
+BASE_PROMPT="$MEETINGINSIGHTS_PROMPT"   # the per-meeting glossary is added on top of this
 export MEETINGINSIGHTS_BEAM="${MEETINGINSIGHTS_BEAM:-$(cfg_get beam 5)}"
 export MEETINGINSIGHTS_THREADS="${MEETINGINSIGHTS_THREADS:-$(cfg_get threads 0)}"
 export MEETINGINSIGHTS_NORMALIZE="${MEETINGINSIGHTS_NORMALIZE:-$(cfg_get normalize off)}"
@@ -244,10 +247,74 @@ PYEOF
     return 0
 }
 
+# --- per-meeting context: a client (with a saved glossary) and a focus for the notes ---
+CLIENTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights/clients"
+_slug() { echo "$1" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//'; }
+
+M_CLIENT=""; M_FOCUS=""; M_CLIENT_SET=0; M_FOCUS_SET=0; POS=()
+_parse_meta_flags() { # splits --client/--focus from the other arguments (left in POS)
+    POS=(); M_CLIENT=""; M_FOCUS=""; M_CLIENT_SET=0; M_FOCUS_SET=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --client) [[ $# -ge 2 ]] || die "--client needs a name"; M_CLIENT="$2"; M_CLIENT_SET=1; shift 2 ;;
+            --focus)  [[ $# -ge 2 ]] || die "--focus needs a text";  M_FOCUS="$2";  M_FOCUS_SET=1;  shift 2 ;;
+            *) POS+=("$1"); shift ;;
+        esac
+    done
+    M_CLIENT="$(echo "$M_CLIENT" | tr '\n\r' '  ')"; M_CLIENT="${M_CLIENT:0:80}"
+    M_FOCUS="$(echo "$M_FOCUS" | tr '\n\r' '  ')";   M_FOCUS="${M_FOCUS:0:500}"
+}
+_meta_load() { # _meta_load <base> : reads <base>.meta into M_CLIENT / M_FOCUS
+    M_CLIENT=""; M_FOCUS=""
+    [[ -f "$1.meta" ]] || return 0
+    M_CLIENT=$(sed -n 's/^client=//p' "$1.meta" | head -n1)
+    M_FOCUS=$(sed -n 's/^focus=//p' "$1.meta" | head -n1)
+}
+_meta_save() { # _meta_save <base>
+    if [[ -n "$M_CLIENT$M_FOCUS" ]]; then
+        { [[ -z "$M_CLIENT" ]] || echo "client=$M_CLIENT"; [[ -z "$M_FOCUS" ]] || echo "focus=$M_FOCUS"; } > "$1.meta"
+    else
+        rm -f "$1.meta"
+    fi
+}
+_meta_env() { # exports the focus/glossary and adds the glossary to the speech prompt
+    local gloss="" f
+    if [[ -n "$M_CLIENT" ]]; then
+        f="$CLIENTS_DIR/$(_slug "$M_CLIENT").txt"
+        [[ -f "$f" ]] && gloss="$(sed -n '2,$p' "$f" | tr '\n\r' '  ')"
+    fi
+    export MEETINGINSIGHTS_CLIENT="$M_CLIENT" MEETINGINSIGHTS_FOCUS="$M_FOCUS" MEETINGINSIGHTS_GLOSSARY="${gloss:0:400}"
+    MEETINGINSIGHTS_PROMPT="$(printf '%s %s' "${gloss:0:400}" "$BASE_PROMPT" | sed 's/^ *//;s/ *$//')"
+    export MEETINGINSIGHTS_PROMPT
+}
+
+cmd_client() { # client [list | show <name> | set <name> <terms...> | rm <name>]
+    local sub="${1:-list}"; shift || true
+    local name="${1:-}" f
+    case "$sub" in
+        list) for f in "$CLIENTS_DIR"/*.txt; do [[ -f "$f" ]] && head -n1 "$f"; done; return 0 ;;
+        show|rm|set) [[ -n "$name" ]] || die "usage: meetinginsights client $sub <name>${sub/#set/ <terms...>}" ;;
+        *) die "usage: meetinginsights client [list|show <name>|set <name> <terms...>|rm <name>]" ;;
+    esac
+    shift
+    f="$CLIENTS_DIR/$(_slug "$name").txt"
+    [[ -n "$(_slug "$name")" ]] || die "invalid client name: $name"
+    case "$sub" in
+        show) [[ -f "$f" ]] || die "no such client: $name"; sed -n '2,$p' "$f" ;;
+        rm)   [[ -f "$f" ]] || die "no such client: $name"; rm -f "$f"; echo "Removed client: $name" ;;
+        set)  local terms="$*"
+              terms="$(echo "$terms" | tr '\n\r' '  ')"
+              mkdir -p "$CLIENTS_DIR"
+              printf '%s\n%s\n' "${name:0:80}" "${terms:0:400}" > "$f"
+              echo "Saved glossary for: $name" ;;
+    esac
+}
+
 cmd_start() {
     [[ -f "$STATE" ]] && die "already recording (see: meetinginsights status)"
     need parec; need ffmpeg; check_ready
-    local title="${1:-meeting}" slug ts base
+    _parse_meta_flags "$@"
+    local title="${POS[0]:-meeting}" slug ts base
     slug=$(echo "$title" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
     ts=$(date +%Y-%m-%d_%H-%M)
     base="$DATA_DIR/rec/${ts}_${slug}"
@@ -287,6 +354,7 @@ cmd_start() {
     kill -0 "$(cat "$DATA_DIR/.mic.pid")" 2>/dev/null || die "microphone capture failed to start"
     kill -0 "$(cat "$DATA_DIR/.sys.pid")" 2>/dev/null || die "system audio capture failed to start"
 
+    _meta_save "$base"; _meta_env
     # transcribe while the meeting runs, so stopping is nearly instant
     if [[ "${MEETINGINSIGHTS_LIVE:-1}" == "1" && -f "$PREFIX/lib/live_transcribe.py" ]]; then
         rm -f "$base.stop" "$base.live.done"
@@ -339,6 +407,7 @@ cmd_stop() {
     [[ -f "$STATE" ]] || die "not recording"
     local base title started
     { read -r base; read -r title; read -r started; } < "$STATE"
+    _meta_load "$base"; _meta_env
 
     local p f
     for p in mic sys; do
@@ -407,6 +476,7 @@ cmd_stop() {
 cmd_notes() {
     local transcript="$1" title="${2:-meeting}" mins="${3:-?}"
     [[ -s "$transcript" ]] || die "empty transcript: $transcript"
+    _meta_load "${transcript%.txt}"; _meta_env
     check_ready
     mkdir -p "$OUT_DIR"
     local out="$OUT_DIR/$(basename "${transcript%.txt}").md"
@@ -492,9 +562,13 @@ _meeting_title() {
 }
 
 cmd_reprocess() {
-    local name="${1:-}" mode="${2:-}"
+    _parse_meta_flags "$@"
+    local name="${POS[0]:-}" mode="${POS[1]:-}" nc="$M_CLIENT" nf="$M_FOCUS" sc="$M_CLIENT_SET" sf="$M_FOCUS_SET"
     _valid_name "$name"
     local base="$DATA_DIR/rec/$name" title mins d
+    _meta_load "$base"
+    (( sc )) && M_CLIENT="$nc"; (( sf )) && M_FOCUS="$nf"
+    _meta_save "$base"; _meta_env
     title=$(_meeting_title "$name")
     if [[ "$mode" != "--notes-only" ]]; then
         [[ -s "$base.wav" ]] || die "the audio for this meeting was not kept: $base.wav"
@@ -529,7 +603,7 @@ cmd_rename() {
     if [[ "$newname" != "$name" ]]; then
         [[ -f "$OUT_DIR/$name.md" ]] && mv -n "$OUT_DIR/$name.md" "$OUT_DIR/$newname.md"
         local ext
-        for ext in txt wav; do
+        for ext in txt wav meta; do
             [[ -f "$DATA_DIR/rec/$name.$ext" ]] && mv -n "$DATA_DIR/rec/$name.$ext" "$DATA_DIR/rec/$newname.$ext"
         done
     fi
@@ -537,7 +611,8 @@ cmd_rename() {
 }
 
 cmd_import() {
-    local file="${1:-}" title="${2:-}"
+    _parse_meta_flags "$@"
+    local file="${POS[0]:-}" title="${POS[1]:-}"
     [[ -f "$file" ]] || die "usage: meetinginsights import <audio-or-video-file> [title]"
     need ffmpeg; check_ready
     [[ -n "$title" ]] || title="$(basename "${file%.*}")"
@@ -547,6 +622,7 @@ cmd_import() {
     base="$DATA_DIR/rec/${ts}_${slug:-meeting}"
     mkdir -p "$DATA_DIR/rec" "$OUT_DIR"
     chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
+    _meta_save "$base"; _meta_env
     echo "Converting the audio..."
     ffmpeg -loglevel error -y -i "$file" -vn -ac 1 -ar 16000 "$base.wav" 2>&1 | tail -2
     [[ -s "$base.wav" ]] || die "could not read audio from: $file"
@@ -587,7 +663,7 @@ cmd_delete() {
     if [[ -f "$STATE" ]] && [[ "$(head -n1 "$STATE")" == "$DATA_DIR/rec/$name" ]]; then
         die "this meeting is being recorded right now"
     fi
-    rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav"
+    rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav" "$DATA_DIR/rec/$name.meta"
     echo "Deleted: $name"
 }
 
@@ -602,10 +678,11 @@ case "${1:-}" in
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;
+    client) shift; cmd_client "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,22p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,25p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac

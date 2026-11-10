@@ -99,6 +99,13 @@ STRINGS = {
         "Save": "Salvar",
         "Could not save the settings": "Não foi possível salvar as configurações",
         "Search meetings…": "Buscar reuniões…",
+        "Client (optional)": "Cliente (opcional)",
+        "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
+        "Glossary": "Glossário",
+        "Glossary for {client}": "Glossário de {client}",
+        "Names and terms that this client uses. They help the transcription and the notes.":
+            "Nomes e termos que esse cliente usa. Ajudam a transcrição e a ata.",
+        "Type the client's name first.": "Digite antes o nome do cliente.",
         "Processor": "Processador",
         "Voices": "Vozes",
         "Tell the people on the call apart by their voice": "Separar as pessoas da chamada pela voz",
@@ -682,6 +689,23 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.new_stack.add_named(imp, "import")
         col.pack_start(self.new_stack, False, False, 0)
 
+        # per-meeting context, shared by recording and importing
+        ctxbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        crow = Gtk.Box(spacing=8)
+        self.client_box = Gtk.ComboBoxText.new_with_entry()
+        self.client_box.get_child().set_placeholder_text(T("Client (optional)"))
+        crow.pack_start(self.client_box, True, True, 0)
+        self.gloss_btn = Gtk.Button(label=T("Glossary"))
+        self.gloss_btn.get_style_context().add_class("nav")
+        self.gloss_btn.connect("clicked", lambda *_: self.on_glossary())
+        crow.pack_start(self.gloss_btn, False, False, 0)
+        ctxbox.pack_start(crow, False, False, 0)
+        self.focus_entry = Gtk.Entry(placeholder_text=T("What matters in this meeting? (optional)"))
+        self.focus_entry.set_max_length(500)
+        ctxbox.pack_start(self.focus_entry, False, False, 0)
+        col.pack_start(ctxbox, False, False, 0)
+        self.refresh_clients()
+
         opts = Gtk.Box(spacing=12)
         opts.set_halign(Gtk.Align.CENTER)
         self.lang_box = Gtk.ComboBoxText()
@@ -698,6 +722,49 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         col.pack_start(opts, False, False, 0)
         self._set_new_mode("record")
         return outer
+
+    def refresh_clients(self):
+        self.client_box.remove_all()
+        r = self.cli("client", "list")
+        for name in r.stdout.splitlines():
+            if name.strip():
+                self.client_box.append_text(name.strip())
+
+    def _meta_args(self):
+        client = self.client_box.get_child().get_text().strip()
+        focus = self.focus_entry.get_text().strip()
+        return (["--client", client] if client else []) + (["--focus", focus] if focus else [])
+
+    def on_glossary(self):
+        client = self.client_box.get_child().get_text().strip()
+        if not client:
+            self.error_dialog(T("Glossary"), T("Type the client's name first."))
+            return
+        d = Gtk.Dialog(title=T("Glossary for {client}", client=client), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        d.add_button(T("Save"), Gtk.ResponseType.OK)
+        area = d.get_content_area(); area.set_spacing(8)
+        for m in ("margin_start", "margin_end", "margin_top", "margin_bottom"):
+            setattr(area.props, m, 14)
+        info = Gtk.Label(label=T("Names and terms that this client uses. They help the transcription and the notes."))
+        info.set_line_wrap(True); info.set_xalign(0)
+        area.pack_start(info, False, False, 0)
+        tv = Gtk.TextView(wrap_mode=Gtk.WrapMode.WORD)
+        tv.set_size_request(420, 120)
+        tv.get_buffer().set_text(self.cli("client", "show", client).stdout.strip())
+        area.pack_start(tv, True, True, 0)
+        d.show_all()
+        resp = d.run()
+        b = tv.get_buffer()
+        text = b.get_text(b.get_start_iter(), b.get_end_iter(), False).strip()
+        d.destroy()
+        if resp == Gtk.ResponseType.OK:
+            if text:
+                self.cli("client", "set", client, text)
+            else:
+                self.cli("client", "rm", client)
+            self.refresh_clients()
+            self.client_box.get_child().set_text(client)
 
     def _set_new_mode(self, key):
         self.new_stack.set_visible_child_name(key)
@@ -734,7 +801,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.set_mode("busy", T("Transcribing…"))
 
         def work():
-            r = self.cli("import", path)
+            r = self.cli("import", path, *self._meta_args())
             GLib.idle_add(self._stop_done, r)
         threading.Thread(target=work, daemon=True).start()
 
@@ -870,6 +937,8 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             ctx.remove_class(c)
         self.mode = mode
         self.lang_box.set_sensitive(mode == "idle")
+        for w in (self.client_box, self.gloss_btn, self.focus_entry):
+            w.set_sensitive(mode == "idle")
         if mode == "recording":
             self.status_lbl.set_text(T("● RECORDING")); ctx.add_class("status-rec")
             self.stop_btn.set_label(T("Stop")); self.stop_btn.set_sensitive(True)
@@ -916,7 +985,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             if not self.is_ready() and not self.run_setup():
                 return
             title = self.entry.get_text().strip() or "meeting"
-            r = self.cli("start", title)
+            r = self.cli("start", title, *self._meta_args())
             if r.returncode == 0:
                 self.started_at = time.time()
                 self.set_mode("recording")

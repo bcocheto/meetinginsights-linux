@@ -37,6 +37,8 @@ _PT = {
     "Open Questions": "Perguntas em aberto", "Owner": "Responsável", "Action": "Ação",
     "Time": "Hora", "said": "disse", "minutes": "minutos", "turns": "falas", "participants": "participantes",
     "Could not summarize.": "Não foi possível resumir.",
+    "Focus": "Foco", "Client": "Cliente", "In focus": "Em foco",
+    "None of the focus points were mentioned.": "Nenhum ponto do foco foi mencionado.",
     "None identified.": "Nenhum identificado.", "None recorded.": "Nenhuma registrada.",
     "None raised.": "Nenhuma levantada.",
     "Notes written by {provider} from the transcript. The transcript was sent to that service.":
@@ -140,12 +142,37 @@ def classify(turn, prev_speaker=None) -> str:
     return "discussion"
 
 
-def summarize_chunk(model, turns) -> str:
+def focus_terms(focus: str) -> set[str]:
+    """Words and figures worth looking for in the transcript (len >= 4, or containing a digit)."""
+    words = re.findall(r"[\w%$.,]+", focus.lower())
+    out = {w.strip(".,") for w in words}
+    return {w for w in out if len(w) >= 4 or any(c.isdigit() for c in w)}
+
+
+def focus_turns(turns, focus: str, limit: int = 8):
+    """Turns that mention the focus, found by plain keyword matching (no model involved)."""
+    terms = focus_terms(focus)
+    if not terms:
+        return []
+    need = 1 if len(terms) < 3 else 2
+    hits = []
+    for t in turns:
+        text = t["text"].lower()
+        n = sum(1 for w in terms if w in text)
+        if n >= need:
+            hits.append((n, t))
+    hits.sort(key=lambda x: -x[0])
+    return [t for _, t in sorted(hits[:limit], key=lambda x: turns.index(x[1]))]
+
+
+def summarize_chunk(model, turns, focus: str = "") -> str:
     # single line: the CLI echoes the prompt, and a multi-line echo would be
     # mistaken for the model's reply by the output parser
     body = "  ".join(f'{t["speaker"]} {T("said")}: {t["text"]}' for t in turns)
     sys_p = ("Summarize this part of a meeting in ONE factual sentence. "
              "Use only what is stated. Do not add names or facts that are not present.")
+    if focus:
+        sys_p += f" The reader mostly cares about: {focus}. Mention it if this part touches it."
     s = chat(model, sys_p, body, 90).strip()
     s = s.split("\n")[0].strip().strip('"')
     return s if len(s) > 15 else ""
@@ -161,6 +188,9 @@ def main() -> int:
         print("no turns parsed", file=sys.stderr)
         return 3
     speakers = sorted({t["speaker"] for t in turns})
+    focus = os.environ.get("MEETINGINSIGHTS_FOCUS", "").strip()
+    client = os.environ.get("MEETINGINSIGHTS_CLIENT", "").strip()
+    glossary = os.environ.get("MEETINGINSIGHTS_GLOSSARY", "").strip()
 
     summaries, buckets, used_external = [], None, ""
     provider = os.environ.get("MEETINGINSIGHTS_NOTES_PROVIDER", "local")
@@ -168,7 +198,7 @@ def main() -> int:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import notes_external
         print(f"writing notes with {provider}", file=sys.stderr)
-        result = notes_external.write_notes(provider, turns)
+        result = notes_external.write_notes(provider, turns, focus, glossary)
         if result:
             summaries, buckets = result
             used_external = provider
@@ -184,7 +214,7 @@ def main() -> int:
         print(f"{len(turns)} turns, {len(chunks)} chunks, model={Path(model).name}", file=sys.stderr)
         for i, ch in enumerate(chunks, 1):
             print(f"  summarizing chunk {i}/{len(chunks)}", file=sys.stderr)
-            s = summarize_chunk(model, ch)
+            s = summarize_chunk(model, ch, focus)
             if s:
                 summaries.append((ch[0]["t"], s))
         buckets = {c: [] for c in CLASSES}
@@ -195,6 +225,10 @@ def main() -> int:
     L = []
     L.append(f"# {title}\n")
     L.append(f"*{minutes} {T('minutes')} · {len(turns)} {T('turns')} · {T('participants')}: {', '.join(speakers)}*\n")
+    if client:
+        L.append(f"> **{T('Client')}:** {client}\n")
+    if focus:
+        L.append(f"> **{T('Focus')}:** {focus}\n")
     if used_external:
         L.append("> " + T("Notes written by {provider} from the transcript. The transcript was "
                           "sent to that service.").format(provider=used_external) + "\n")
@@ -206,6 +240,13 @@ def main() -> int:
     L.append(f"## {T('Summary')}\n")
     L.extend(f"- {s}" for _, s in summaries) if summaries else L.append(f"_{T('Could not summarize.')}_")
     L.append("")
+
+    if focus:
+        L.append(f"## {T('In focus')}\n")
+        hits = focus_turns(turns, focus)
+        L.extend(f'- **{t["speaker"]}** ({t["t"]}): {t["text"]}' for t in hits) if hits \
+            else L.append(f"_{T('None of the focus points were mentioned.')}_")
+        L.append("")
 
     L.append(f"## {T('Action Items')}\n")
     if buckets["action"]:

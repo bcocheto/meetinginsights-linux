@@ -49,11 +49,24 @@ def available(provider: str) -> str | None:
     return None
 
 
-def _command(provider: str, exe: str) -> list[str]:
+def system_prompt(focus: str = "", glossary: str = "") -> str:
+    """The base instructions plus the per-meeting focus and the client's glossary."""
+    extra = ""
+    if focus:
+        extra += (" The reader cares most about this for this meeting: " + focus +
+                  " Give it extra attention in the summary and surface related decisions, "
+                  "actions and open questions, quoting what was actually said.")
+    if glossary:
+        extra += (" Names and terms used by this client (use this exact spelling if the "
+                  "transcript has a near miss): " + glossary)
+    return SYSTEM + extra
+
+
+def _command(provider: str, exe: str, system: str = SYSTEM) -> list[str]:
     if provider == "claude-code":
         return [exe, "-p", "--no-session-persistence", "--tools", "",
-                "--disable-slash-commands", "--system-prompt", SYSTEM, "--output-format", "text"]
-    return [exe, "-p", SYSTEM + "\n\nThe transcript follows on standard input."]
+                "--disable-slash-commands", "--system-prompt", system, "--output-format", "text"]
+    return [exe, "-p", system + "\n\nThe transcript follows on standard input."]
 
 
 def _extract_json(text: str):
@@ -68,14 +81,14 @@ def _extract_json(text: str):
         return None
 
 
-def write_notes(provider: str, turns: list[dict]):
+def write_notes(provider: str, turns: list[dict], focus: str = "", glossary: str = ""):
     """Return (summaries, buckets) in the shape notes_local expects, or None on failure."""
     exe = available(provider)
     if not exe:
         return None
     transcript = "\n".join(f'[{t["t"]}] {t["speaker"]}: {t["text"]}' for t in turns)
     try:
-        r = subprocess.run(_command(provider, exe), input=transcript, capture_output=True,
+        r = subprocess.run(_command(provider, exe, system_prompt(focus, glossary)), input=transcript, capture_output=True,
                            text=True, timeout=TIMEOUT_S, cwd=tempfile.gettempdir())
     except (subprocess.TimeoutExpired, OSError):
         return None
