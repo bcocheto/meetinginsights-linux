@@ -15,6 +15,8 @@ is one) and summarised by a small local model through
 - **Record or import.** Capture the microphone and the call audio together, or drop in a
   recording (any audio or video file).
 - **Live transcription** while the meeting runs, so stopping is nearly instant.
+- **Input meters** for the microphone and the call audio while recording, with a warning if
+  one of them stops picking up sound, so a dead input is caught in seconds, not after the meeting.
 - **Who said what.** You, and each voice on the far end (*Participant 1, 2…*).
 - **Notes**: summary, action items with owners, decisions and open questions, in the
   language of the meeting (Portuguese and English).

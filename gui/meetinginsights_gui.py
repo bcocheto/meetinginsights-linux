@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -102,6 +103,17 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Microphone": "Microfone", "Call audio": "Áudio da chamada",
+        "The microphone is not picking up anything. Check that it is plugged in, "
+        "not muted, and selected in Sound settings.":
+            "O microfone não está captando nada. Veja se está conectado, sem mudo e escolhido nas "
+            "configurações de Som.",
+        "No sound from the microphone for a while.": "Sem som no microfone há um tempo.",
+        "The call audio is not being captured. Check the output device in Sound "
+        "settings. Headphones are fine, but the call must play on this computer.":
+            "O áudio da chamada não está sendo capturado. Veja o dispositivo de saída nas "
+            "configurações de Som. Fone de ouvido serve, mas a chamada precisa tocar neste computador.",
+        "No call audio for a while.": "Sem áudio da chamada há um tempo.",
         "Local model: small (0.5 GB, fast)": "Modelo local: pequeno (0,5 GB, rápido)",
         "Local model: medium (2 GB, better summaries)": "Modelo local: médio (2 GB, resumos melhores)",
         "Used when the notes are written on this computer. The medium model "
@@ -203,6 +215,11 @@ def T(text: str, **kw) -> str:
 
 HOME = Path.home()
 NOTES_DIR = Path(os.environ.get("MEETINGINSIGHTS_OUT", HOME / "MeetingNotes"))
+for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/meetinginsights/lib")):
+    if (_lib / "levels.py").exists():
+        sys.path.insert(0, str(_lib)); break
+import levels  # noqa: E402
+
 DATA_DIR = Path(os.environ.get("MEETINGINSIGHTS_HOME", HOME / ".local/share/meetinginsights"))
 LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "meetinginsights" / "language"
 LANGUAGES = [  # (setting stored in the config file, label)
@@ -635,6 +652,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         GLib.timeout_add(400, self._first_run_check)
         GLib.timeout_add(1500, self._recover_check)
         GLib.timeout_add_seconds(1, self.tick)
+        GLib.timeout_add(200, self._levels_tick)
 
     # ---------- the "new meeting" page: record or import ----------
     def _build_new_page(self):
@@ -823,7 +841,26 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.selected = None
         self._update_stage()
 
+    def _meter(self, text):
+        box = Gtk.Box(spacing=6)
+        lbl = Gtk.Label(label=T(text)); lbl.get_style_context().add_class("micro")
+        bar = Gtk.LevelBar(); bar.set_min_value(0); bar.set_max_value(1)
+        bar.set_size_request(70, 8); bar.set_valign(Gtk.Align.CENTER)
+        box.pack_start(lbl, False, False, 0); box.pack_start(bar, False, False, 0)
+        return box, bar
+
     def _build_recbar(self):
+        wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        wrap.pack_start(self._build_recbar_row(), False, False, 0)
+        self.audio_warn = Gtk.Label(label="", xalign=0, wrap=True)
+        self.audio_warn.get_style_context().add_class("status-rec")
+        self.audio_warn.set_margin_start(18); self.audio_warn.set_margin_end(18)
+        self.audio_warn.set_margin_bottom(8)
+        self.audio_warn.set_no_show_all(True)
+        wrap.pack_start(self.audio_warn, False, False, 0)
+        return wrap
+
+    def _build_recbar_row(self):
         bar = Gtk.Box(spacing=14)
         bar.set_margin_top(10); bar.set_margin_bottom(10)
         bar.set_margin_start(18); bar.set_margin_end(18)
@@ -833,6 +870,13 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.timer_lbl = Gtk.Label(label="00:00")
         self.timer_lbl.get_style_context().add_class("timer")
         bar.pack_start(self.timer_lbl, False, False, 0)
+        mic_box, self.mic_bar = self._meter("Microphone")
+        sys_box, self.sys_bar = self._meter("Call audio")
+        self.meters = Gtk.Box(spacing=14)
+        self.meters.pack_start(mic_box, False, False, 0)
+        self.meters.pack_start(sys_box, False, False, 0)
+        self.meters.set_no_show_all(True)
+        bar.pack_start(self.meters, False, False, 0)
         self.stop_btn = Gtk.Button(label=T("Stop"))
         self.stop_btn.get_style_context().add_class("quiet")
         self.stop_btn.set_halign(Gtk.Align.END); self.stop_btn.set_hexpand(True)
@@ -876,6 +920,43 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             return Path(first) if first else None
         except (OSError, IndexError):
             return None
+
+    def _levels_tick(self):
+        """Update the input meters and warn when a channel has gone quiet (5x a second)."""
+        if self.mode != "recording":
+            self.meters.hide(); self.audio_warn.hide(); self._watch = None
+            return True
+        base = self.current_base()
+        if not base:
+            return True
+        self.meters.show_all()
+        now = time.time()
+        if getattr(self, "_watch", None) is None or self._watch_base != str(base):
+            self._watch_base = str(base)
+            self._watch = {"mic": levels.Watch(now), "sys": levels.Watch(now)}
+        db = {"mic": levels.tail_db(f"{base}.mic.wav"), "sys": levels.tail_db(f"{base}.sys.wav")}
+        for k, w in self._watch.items():
+            w.update(db[k], now)
+        self.mic_bar.set_value(levels.as_fraction(db["mic"]))
+        self.sys_bar.set_value(levels.as_fraction(db["sys"]))
+        msgs = []
+        st = self._watch["mic"].state(now)
+        if st == "dead":
+            msgs.append(T("The microphone is not picking up anything. Check that it is plugged in, "
+                          "not muted, and selected in Sound settings."))
+        elif st == "quiet":
+            msgs.append(T("No sound from the microphone for a while."))
+        st = self._watch["sys"].state(now)
+        if st == "dead":
+            msgs.append(T("The call audio is not being captured. Check the output device in Sound "
+                          "settings. Headphones are fine, but the call must play on this computer."))
+        elif st == "quiet":
+            msgs.append(T("No call audio for a while."))
+        if msgs:
+            self.audio_warn.set_text("⚠  " + "  ".join(msgs)); self.audio_warn.show()
+        else:
+            self.audio_warn.hide()
+        return True
 
     def show_live(self):
         base = self.current_base()
