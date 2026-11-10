@@ -273,24 +273,70 @@ except (OSError, subprocess.SubprocessError):
     pass
 
 # ---------------------------------------------------------------- theme
-# Same visual language as Gavetta: neutral dark surface, GNOME blue accent,
-# rounded cards, pill-shaped inputs and chips, hairline borders.
-THEME = {
-    "bg":            "#1a1a1a",
-    "bg_bar":        "#161616",
-    "surface":       "rgba(255,255,255,0.05)",
-    "surface_hover": "rgba(255,255,255,0.09)",
-    "field":         "rgba(255,255,255,0.06)",
-    "hairline":      "rgba(255,255,255,0.08)",
+# Same visual language as Gavetta, Clima and Cadência: neutral surface, GNOME blue
+# accent, rounded cards (12px), pill inputs and chips, hairline borders. Dark or light
+# follows the system (org.gnome.desktop.interface color-scheme); MINUTA_THEME overrides.
+THEME_DARK = {
+    "bg":            "#222226",
+    "bg_bar":        "#1c1c20",
+    "surface":       "rgba(255,255,255,0.055)",
+    "surface_hover": "rgba(255,255,255,0.10)",
+    "field":         "rgba(255,255,255,0.07)",
+    "hairline":      "rgba(255,255,255,0.10)",
     "accent":        "#3584e4",
     "accent_soft":   "#62a0ea",
-    "text_primary":  "#ececec",
-    "text_secondary":"rgba(255,255,255,0.50)",
+    "text_primary":  "#f2f2f2",
+    "text_secondary":"rgba(255,255,255,0.55)",
     "danger":        "#e01b24",
     "warn":          "#f5c211",
+    "ok":            "#57e389",
+    "cloud":         "#ffa348",
+    "ink":           "255,255,255",
+    "strong":        "#ffffff",
+}
+THEME_LIGHT = {
+    "bg":            "#fafafb",
+    "bg_bar":        "#f0f0f3",
+    "surface":       "rgba(0,0,0,0.045)",
+    "surface_hover": "rgba(0,0,0,0.08)",
+    "field":         "rgba(0,0,0,0.05)",
+    "hairline":      "rgba(0,0,0,0.12)",
+    "accent":        "#3584e4",
+    "accent_soft":   "#1c71d8",
+    "text_primary":  "#241f31",
+    "text_secondary":"rgba(0,0,0,0.58)",
+    "danger":        "#c01c28",
+    "warn":          "#b8860b",
+    "ok":            "#1a7f4b",
+    "cloud":         "#b85c00",
+    "ink":           "0,0,0",
+    "strong":        "#000000",
 }
 
-CSS = ("""
+
+def system_is_dark() -> bool:
+    forced = os.environ.get("MINUTA_THEME", "").lower()
+    if forced in ("dark", "light"):
+        return forced == "dark"
+    try:
+        out = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+                             capture_output=True, text=True, timeout=3).stdout
+        return "light" not in out
+    except (OSError, subprocess.SubprocessError):
+        return True
+
+
+IS_DARK = system_is_dark()
+THEME = THEME_DARK if IS_DARK else THEME_LIGHT
+
+
+def themed(css: str) -> str:
+    """Fill the %(token)s placeholders; overlays written as white become black on light."""
+    css = css.replace("rgba(255,255,255,", "rgba(%(ink)s,").replace("rgba(255, 255, 255, ", "rgba(%(ink)s, ")
+    return re.sub(r"%\((\w+)\)s", lambda m: THEME[m.group(1)], css)
+
+
+_CSS_SRC = """
 window, .root { background-color: %(bg)s; color: %(text_primary)s; }
 headerbar { background: %(bg_bar)s; border-bottom: 1px solid %(hairline)s; box-shadow: none; color: %(text_primary)s; min-height: 38px; }
 headerbar button { border-radius: 999px; background: transparent; border: none; box-shadow: none; color: %(text_secondary)s; }
@@ -299,10 +345,10 @@ headerbar button:hover { background: %(surface_hover)s; color: %(text_primary)s;
 /* sidebar: flat, like Vibe */
 .sidebar { background: %(bg)s; padding: 14px 8px 4px 8px; }
 .sidebar-title { font-size: 16px; font-weight: 700; padding: 2px 10px 10px 10px; }
-.section-label { font-size: 10px; font-weight: 600; letter-spacing: 1.3px; color: %(text_secondary)s; padding: 16px 10px 6px 10px; }
+.section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; color: %(text_secondary)s; padding: 16px 10px 6px 10px; }
 button.nav {
   background: transparent; border: none; box-shadow: none; color: %(text_primary)s;
-  border-radius: 8px; padding: 8px 10px; font-weight: 500;
+  border-radius: 12px; padding: 8px 10px; font-weight: 500;
 }
 button.nav:hover { background: %(surface_hover)s; }
 separator { background: %(hairline)s; min-width: 1px; min-height: 1px; margin: 0; }
@@ -312,7 +358,7 @@ separator { background: %(hairline)s; min-width: 1px; min-height: 1px; margin: 0
 .status-rec  { color: %(danger)s; }
 .status-busy { color: %(accent_soft)s; }
 .dim-label { color: %(text_secondary)s; font-size: 12px; }
-.dim-icon { color: rgba(255,255,255,0.55); }
+.dim-icon { color: %(text_secondary)s; }
 .drop-title { font-size: 16px; font-weight: 600; color: %(text_primary)s; }
 
 entry, searchentry {
@@ -321,6 +367,8 @@ entry, searchentry {
   font-size: 14px; box-shadow: none;
 }
 entry:focus, searchentry:focus { border-color: %(accent_soft)s; background: rgba(255,255,255,0.09); }
+entry image, searchentry image { color: %(text_secondary)s; }
+entry placeholder, searchentry placeholder { color: %(text_secondary)s; }
 searchentry { margin: 0 6px 8px 6px; padding: 6px 12px; }
 
 combobox button.combo {
@@ -346,9 +394,10 @@ button.loud:disabled, button.quiet:disabled {
 
 /* recents: flat rows */
 list, list row { background: transparent; }
-list row { margin: 1px 4px; padding: 8px 10px; border-radius: 8px; border: none; }
-list row:hover { background: %(surface)s; }
-list row:selected { background: %(surface_hover)s; }
+list row { margin: 1px 4px; padding: 8px 10px; border-radius: 12px; border: 1px solid transparent; }
+list row, list row image { color: %(text_primary)s; }
+list row:hover { background: %(surface_hover)s; }
+list row:selected { background: alpha(%(accent)s, 0.22); border-color: alpha(%(accent_soft)s, 0.60); }
 .row-title { color: %(text_primary)s; font-weight: 500; }
 .row-meta  { color: %(text_secondary)s; font-size: 11px; }
 .empty { color: %(text_secondary)s; font-size: 12px; }
@@ -362,58 +411,69 @@ list row:selected { background: %(surface_hover)s; }
 .segment button:hover { color: %(text_primary)s; }
 .segment button.active { background: rgba(255,255,255,0.10); color: %(text_primary)s; }
 .dropzone {
-  border: 1.5px dashed rgba(255,255,255,0.16); border-radius: 18px; padding: 34px 28px;
+  border: 1.5px dashed %(hairline)s; border-radius: 18px; padding: 34px 28px;
 }
 eventbox:hover .dropzone { border-color: %(accent_soft)s; }
 
 .tag-local, .tag-cloud { font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
-.tag-local { color: #57e389; background: alpha(#57e389, 0.14); }
-.tag-cloud { color: #ffa348; background: alpha(#ffa348, 0.16); }
+.tag-local { color: %(ok)s; background: alpha(%(ok)s, 0.14); }
+.tag-cloud { color: %(cloud)s; background: alpha(%(cloud)s, 0.16); }
 
 /* action bar: chips */
 button.chip {
   padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
-  background: %(surface)s; color: rgba(255,255,255,0.75);
+  background: %(surface)s; color: %(text_secondary)s;
   border: none; box-shadow: none;
 }
-button.chip:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
+button.chip:hover { background: rgba(255,255,255,0.15); color: %(strong)s; }
 button.chip.danger:hover { background: alpha(%(danger)s, 0.60); color: #ffffff; }
-button.chip:disabled { color: rgba(255,255,255,0.28); }
+button.chip:disabled { color: alpha(%(text_secondary)s, 0.5); }
 
 dialog, messagedialog { background: %(bg)s; color: %(text_primary)s; }
-""" % THEME).encode()
+dialog .dialog-action-area button, messagedialog .dialog-action-area button {
+  background: %(surface)s; color: %(text_primary)s; border: 1px solid %(hairline)s;
+  border-radius: 999px; box-shadow: none; padding: 6px 20px; font-weight: 600;
+}
+dialog .dialog-action-area button:hover, messagedialog .dialog-action-area button:hover { background: %(surface_hover)s; }
+dialog .dialog-action-area button.suggested-action, messagedialog .dialog-action-area button.suggested-action {
+  background: %(accent)s; color: #ffffff; border: none;
+}
+dialog .dialog-action-area button.suggested-action:hover, messagedialog .dialog-action-area button.suggested-action:hover { background: %(accent_soft)s; }
+"""
+CSS = themed(_CSS_SRC).encode()
 
-NOTE_CSS = """
-:root { color-scheme: dark; }
-body { background:#1a1a1a; color:#e6e6e8; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+_NOTE_SRC = """
+:root { color-scheme: %(scheme)s; }
+body { background:%(bg)s; color:%(text_primary)s; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
        font-size: 14px; line-height: 1.65; padding: 24px 28px; margin:0; }
-h1 { font-size: 21px; color:#fff; margin:0 0 4px; }
+h1 { font-size: 21px; color:%(strong)s; margin:0 0 4px; }
 h2 { font-size: 13px; letter-spacing: .6px; text-transform: uppercase; color: rgba(255,255,255,.55);
      margin: 26px 0 10px; font-weight: 700; }
-h3 { font-size: 13.5px; color:#e6e6e8; margin: 16px 0 4px; }
+h3 { font-size: 13.5px; color:%(text_primary)s; margin: 16px 0 4px; }
 table { border-collapse: separate; border-spacing: 0; width:100%; margin:10px 0; font-size:13px;
-        border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; }
+        border:1px solid %(hairline)s; border-radius:12px; overflow:hidden; }
 th { text-align:left; background:rgba(255,255,255,.07); color:rgba(255,255,255,.7); padding:8px 12px; }
 td { padding:8px 12px; border-top:1px solid rgba(255,255,255,.06); vertical-align: top; }
 code { background:rgba(255,255,255,.08); padding:1px 6px; border-radius:6px; font-size:12.5px; }
-blockquote { border-left:3px solid #62a0ea; margin:12px 0; padding:8px 14px; color:rgba(255,255,255,.65);
+blockquote { border-left:3px solid %(accent_soft)s; margin:12px 0; padding:8px 14px; color:rgba(255,255,255,.65);
              background:rgba(255,255,255,.04); border-radius:0 10px 10px 0; }
-strong { color:#fff; }
+strong { color:%(strong)s; }
 ul,ol { padding-left: 22px; }
 li { margin: 4px 0; }
-li::marker { color:#62a0ea; }
-a { color:#62a0ea; }
+li::marker { color:%(accent_soft)s; }
+a { color:%(accent_soft)s; }
 pre { background:rgba(255,255,255,.05); border-radius:12px; padding:12px 14px; }
 .turn { margin: 0 0 16px; }
 .who { font-weight: 700; font-size: 13px; }
 .ts { font-weight: 400; font-size: 11px; margin-left: 8px; color: rgba(255,255,255,.38);
       font-variant-numeric: tabular-nums; }
-.say { margin: 3px 0 0; padding: 1px 0 1px 12px; border-left: 2px solid var(--c); color: #e6e6e8; }
+.say { margin: 3px 0 0; padding: 1px 0 1px 12px; border-left: 2px solid var(--c); color: %(text_primary)s; }
 em { color: rgba(255,255,255,.6); }
 """
+NOTE_CSS = themed(_NOTE_SRC.replace("%(scheme)s", "dark" if IS_DARK else "light"))
 
-
-SPEAKER_COLORS = ["#62a0ea", "#57e389", "#f5c211", "#dc8add", "#ffa348", "#78aeed"]
+SPEAKER_COLORS = (["#62a0ea", "#57e389", "#f5c211", "#dc8add", "#ffa348", "#78aeed"] if IS_DARK else
+                  ["#1c71d8", "#1a7f4b", "#9a6a00", "#9141ac", "#b85c00", "#1a5fb4"])
 
 
 def transcript_html(text: str) -> str:
@@ -1040,7 +1100,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
             body = ""
             note = f"<p class='hint'>{html.escape(T('Listening. The first lines appear after about a minute of speech.'))}</p>"
         self.webview.load_html(
-            f"<style>{NOTE_CSS}.hint{{color:rgba(255,255,255,.5);font-style:italic}}</style>"
+            f"<style>{NOTE_CSS}.hint{{color:{THEME['text_secondary']};font-style:italic}}</style>"
             f"<h2>{html.escape(T('Live transcript'))}</h2>{note}{body}"
             "<script>window.scrollTo(0, document.body.scrollHeight);</script>", None)
 
@@ -1915,6 +1975,7 @@ class MinutaApp(Gtk.Application):
         GLib.set_prgname("io.github.bcocheto.Minuta")
         Gtk.Window.set_default_icon_name("minuta")
         Notify.init("Minuta")
+        Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", IS_DARK)
         provider = Gtk.CssProvider()
         provider.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_screen(
