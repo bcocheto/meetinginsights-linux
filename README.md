@@ -6,6 +6,8 @@
 
 **Record a meeting. Get the transcript and the minutes. Nothing leaves your computer.**
 
+<sub>Formerly *MeetingInsights* — [what changed](#upgrading-from-meetinginsights)</sub>
+
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-004c99)](LICENSE)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-004c99)](#install)
 [![Runs offline](https://img.shields.io/badge/runs-offline-1f8a4c)](#privacy)
@@ -116,7 +118,7 @@ detail wrong, so read the notes before you share them.
 
 ## Install
 
-**Debian / Ubuntu** — the package bundles the llama.cpp runtime, so nothing has to be compiled:
+**Debian / Ubuntu** — download the `.deb` from the [latest release](https://github.com/bcocheto/minuta/releases/latest). The package bundles the llama.cpp runtime, so nothing has to be compiled:
 
 ```sh
 sudo apt install ./minuta_<version>_amd64.deb
@@ -126,6 +128,7 @@ minuta setup      # prepares Python and downloads the models, once
 **From source** (any distro):
 
 ```sh
+git clone https://github.com/bcocheto/minuta && cd minuta
 ./install.sh               # installs to ~/.local
 minuta setup
 ```
@@ -144,6 +147,18 @@ cp build/bin/llama build/bin/*.so* ~/.local/share/minuta/llama/
 Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04 and 22.04 —
 which is why the `.deb` ships its own build.
 </details>
+
+### Upgrading from MeetingInsights
+
+Minuta is the new name of MeetingInsights, with a new icon. Nothing is lost when you upgrade:
+
+- **Package:** `sudo apt install ./minuta_<version>_amd64.deb` replaces the old `meetinginsights` package.
+  **From source:** run `./install.sh` again; it removes the old program files and **keeps your data**.
+- **Your data moves, once:** `~/.local/share/meetinginsights` → `~/.local/share/minuta` (models, Python
+  environment, recordings) and `~/.config/meetinginsights` → `~/.config/minuta` (settings, clients). Your notes in
+  `~/MeetingNotes` stay where they are.
+- **Names:** the commands are now `minuta` and `minuta-gui`, and the variables `MINUTA_*` (the old
+  `MEETINGINSIGHTS_*` still work). The application id is `io.github.bcocheto.Minuta`.
 
 ## Use
 

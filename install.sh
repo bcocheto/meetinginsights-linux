@@ -19,11 +19,24 @@ if ((${#missing[@]})); then
     exit 1
 fi
 
-# the app used to be called MeetingInsights: remove the old program files (your data is moved on first run)
-rm -rf "$PREFIX/share/meetinginsights"
+# The app used to be called MeetingInsights. Its models, environment and recordings lived in the
+# same folder as its program files, so move that folder as a whole (never delete it) and keep the settings.
+OLD_DATA="$HOME/.local/share/meetinginsights"
+OLD_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/meetinginsights"; NEW_CFG="${XDG_CONFIG_HOME:-$HOME/.config}/minuta"
+if [[ -d "$OLD_DATA" && ! -e "$DATA" ]]; then
+    mv "$OLD_DATA" "$DATA" && echo "Moved your data from $OLD_DATA to $DATA"
+fi
+if [[ -d "$OLD_CFG" && ! -e "$NEW_CFG" ]]; then
+    mv "$OLD_CFG" "$NEW_CFG" && echo "Moved your settings from $OLD_CFG to $NEW_CFG"
+fi
+# old program files only: lib/ and gui/ hold code, never data
+rm -rf "$PREFIX/share/meetinginsights/lib" "$PREFIX/share/meetinginsights/gui"
+rmdir "$PREFIX/share/meetinginsights" 2>/dev/null || true
 rm -f "$PREFIX/bin/meetinginsights" "$PREFIX/bin/meetinginsights-gui" \
       "$PREFIX/share/applications/page.saurabh.MeetingInsights.desktop" "$PREFIX/share/applications/meetinginsights.desktop"
 find "$PREFIX/share/icons/hicolor" -name 'meetinginsights.png' -delete 2>/dev/null || true
+# replace our own code folders cleanly, whatever a previous version left in them
+rm -rf "$SHARE/lib" "$SHARE/gui"
 
 mkdir -p "$SHARE" "$PREFIX/bin" "$PREFIX/share/applications" "$DATA/models"
 cp -r "$SRC/lib" "$SRC/gui" "$SHARE/"

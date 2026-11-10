@@ -6,6 +6,8 @@
 
 **Grave uma reunião. Receba a transcrição e a ata. Nada sai do seu computador.**
 
+<sub>Antes chamada de *MeetingInsights*: [o que mudou](#atualizando-do-meetinginsights)</sub>
+
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-004c99)](LICENSE)
 [![Plataforma: Linux](https://img.shields.io/badge/plataforma-Linux-004c99)](#instalação)
 [![Funciona offline](https://img.shields.io/badge/funciona-offline-1f8a4c)](#privacidade)
@@ -119,7 +121,7 @@ pequeno, ele ainda pode errar um detalhe: leia a ata antes de compartilhar.
 
 ## Instalação
 
-**Debian / Ubuntu**: o pacote já traz o llama.cpp, então não é preciso compilar nada:
+**Debian / Ubuntu**: baixe o `.deb` da [última release](https://github.com/bcocheto/minuta/releases/latest). O pacote já traz o llama.cpp, então não é preciso compilar nada:
 
 ```sh
 sudo apt install ./minuta_<versão>_amd64.deb
@@ -129,6 +131,7 @@ minuta setup      # prepara o Python e baixa os modelos, uma vez
 **A partir do código-fonte** (qualquer distribuição):
 
 ```sh
+git clone https://github.com/bcocheto/minuta && cd minuta
 ./install.sh               # instala em ~/.local
 minuta setup
 ```
@@ -147,6 +150,18 @@ cp build/bin/llama build/bin/*.so* ~/.local/share/minuta/llama/
 Os binários prontos do projeto original exigem a glibc 2.34, o que exclui o Ubuntu 20.04 e o
 22.04. Por isso o `.deb` traz a própria compilação.
 </details>
+
+### Atualizando do MeetingInsights
+
+A Minuta é o novo nome do MeetingInsights, com um ícone novo. Nada se perde na atualização:
+
+- **Pacote:** `sudo apt install ./minuta_<versão>_amd64.deb` substitui o pacote antigo `meetinginsights`.
+  **Pelo código-fonte:** rode o `./install.sh` de novo; ele remove os arquivos antigos do programa e **mantém os seus dados**.
+- **Os dados são movidos, uma vez:** `~/.local/share/meetinginsights` → `~/.local/share/minuta` (modelos,
+  ambiente Python, gravações) e `~/.config/meetinginsights` → `~/.config/minuta` (configurações, clientes). As suas atas em
+  `~/MeetingNotes` ficam onde estão.
+- **Nomes:** os comandos agora são `minuta` e `minuta-gui`, e as variáveis, `MINUTA_*` (as antigas
+  `MEETINGINSIGHTS_*` continuam valendo). O identificador do app é `io.github.bcocheto.Minuta`.
 
 ## Uso
 
