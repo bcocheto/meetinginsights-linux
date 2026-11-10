@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 LLAMA_DIR = Path(os.environ.get(
-    "MINUTA_LLAMA_DIR", Path.home() / ".local/share/minuta/llama"))
+    "MINUTA_LLAMA_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "minuta/llama"))
 LLAMA_BIN = LLAMA_DIR / "llama"
 THREADS = os.environ.get("MINUTA_THREADS", "0")
 if not THREADS.isdigit() or int(THREADS) < 1:

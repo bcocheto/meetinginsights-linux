@@ -257,14 +257,19 @@ def T(text: str, **kw) -> str:
 
 
 HOME = Path.home()
-NOTES_DIR = Path(os.environ.get("MINUTA_OUT", HOME / "MeetingNotes"))
+FLATPAK_ID = os.environ.get("FLATPAK_ID", "")
+APP_ICON = FLATPAK_ID or "minuta"      # a Flatpak exports its icon under the application id
+DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share"))
+NOTES_DIR = Path(os.environ.get("MINUTA_OUT") or (
+    Path(GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) or HOME / "Documents") / "Minuta"
+    if FLATPAK_ID else HOME / "MeetingNotes"))
 for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/minuta/lib")):
     if (_lib / "levels.py").exists():
         sys.path.insert(0, str(_lib)); break
 import levels  # noqa: E402
 import search as msearch  # noqa: E402
 
-DATA_DIR = Path(os.environ.get("MINUTA_HOME", HOME / ".local/share/minuta"))
+DATA_DIR = Path(os.environ.get("MINUTA_HOME", DATA_HOME / "minuta"))
 LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "minuta" / "language"
 LANGUAGES = [  # (setting stored in the config file, label)
     ("system", T("Language: system default")),
@@ -272,7 +277,7 @@ LANGUAGES = [  # (setting stored in the config file, label)
     ("pt", "Português"), ("en", "English"), ("es", "Español"),
     ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
 ]
-REC_DIR = Path(os.environ.get("MINUTA_HOME", HOME / ".local/share/minuta")) / "rec"
+REC_DIR = Path(os.environ.get("MINUTA_HOME", DATA_HOME / "minuta")) / "rec"
 CLI = os.environ.get("MINUTA_CLI") or shutil.which("minuta") or str(
     Path(__file__).resolve().parent.parent / "bin" / "minuta")
 
@@ -1962,9 +1967,14 @@ class MinutaWindow(Gtk.ApplicationWindow):
         current_keys = (lambda r: r.stdout.strip() if r.returncode == 0 else "")(self.cli("shortcut", "show"))
         box.pack_start(heading("Keyboard shortcut"), False, False, 0)
         keys_entry = Gtk.Entry(text=current_keys, placeholder_text="<Super><Alt>r")
-        box.pack_start(keys_entry, False, False, 0)
-        box.pack_start(note("Starts and stops a recording from anywhere, for example <Super><Alt>r. "
-                            "Leave it empty for none. Needs GNOME."), False, False, 0)
+        if FLATPAK_ID:
+            keys_entry.set_sensitive(False)
+            box.pack_start(note("Sandboxed app: in Settings > Keyboard > Custom Shortcuts, add one that runs: "
+                                f"flatpak run --command=minuta {FLATPAK_ID} toggle"), False, False, 0)
+        else:
+            box.pack_start(keys_entry, False, False, 0)
+            box.pack_start(note("Starts and stops a recording from anywhere, for example <Super><Alt>r. "
+                                "Leave it empty for none. Needs GNOME."), False, False, 0)
 
         # ---- notes writer
         box.pack_start(heading("Who writes the notes"), False, False, 0)
@@ -2030,7 +2040,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
     # ---------- helpers ----------
     def notify(self, summary, body):
         try:
-            n = Notify.Notification.new(summary, body, "minuta")
+            n = Notify.Notification.new(summary, body, APP_ICON)
             n.show()
         except Exception:
             pass
@@ -2050,7 +2060,7 @@ class MinutaApp(Gtk.Application):
     def do_startup(self):
         Gtk.Application.do_startup(self)
         GLib.set_prgname("io.github.bcocheto.Minuta")
-        Gtk.Window.set_default_icon_name("minuta")
+        Gtk.Window.set_default_icon_name(APP_ICON)
         Notify.init("Minuta")
         Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", IS_DARK)
         provider = Gtk.CssProvider()

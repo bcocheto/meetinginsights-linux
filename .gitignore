@@ -1,9 +1,10 @@
-__pycache__/
-*.pyc
-*.egg-info/
 build/
+build-flatpak/
 dist/
+*.egg-info/
+.flatpak-builder/
+*.gguf
+*.pyc
+__pycache__/
 .venv/
 venv/
-*.gguf
-dist/

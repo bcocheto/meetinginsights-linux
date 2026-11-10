@@ -148,6 +148,17 @@ Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04 an
 which is why the `.deb` ships its own build.
 </details>
 
+### Flatpak (work in progress)
+
+`packaging/flatpak/` has the manifest and the AppStream file for Flathub. Build and try it locally with:
+
+```sh
+flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse build-flatpak packaging/flatpak/io.github.bcocheto.Minuta.yml
+flatpak run io.github.bcocheto.Minuta
+```
+
+The Flatpak transcribes on the CPU (no NVIDIA libraries), keeps the notes in `Documents/Minuta`, and cannot use the `claude` or `gemini` command of your system.
+
 ### Upgrading from MeetingInsights
 
 Minuta is the new name of MeetingInsights, with a new icon. Nothing is lost when you upgrade:

@@ -151,6 +151,17 @@ Os binários prontos do projeto original exigem a glibc 2.34, o que exclui o Ubu
 22.04. Por isso o `.deb` traz a própria compilação.
 </details>
 
+### Flatpak (em andamento)
+
+Em `packaging/flatpak/` estão o manifesto e o arquivo AppStream para o Flathub. Para compilar e testar localmente:
+
+```sh
+flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse build-flatpak packaging/flatpak/io.github.bcocheto.Minuta.yml
+flatpak run io.github.bcocheto.Minuta
+```
+
+O Flatpak transcreve na CPU (sem as bibliotecas da NVIDIA), guarda as atas em `Documentos/Minuta` e não consegue usar o comando `claude` ou `gemini` do seu sistema.
+
 ### Atualizando do MeetingInsights
 
 A Minuta é o novo nome do MeetingInsights, com um ícone novo. Nada se perde na atualização:

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.bcocheto.Minuta</id>
+  <name>Minuta</name>
+  <summary>Record a meeting and get the transcript and the minutes, on your computer</summary>
+  <summary xml:lang="pt">Grave uma reunião e receba a transcrição e a ata, no seu computador</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.bcocheto">
+    <name>Breno Cocheto</name>
+  </developer>
+
+  <description>
+    <p>Minuta records your meetings, writes down who said what and drafts the minutes. The speech recognition and the notes run on your computer, so by default nothing is uploaded.</p>
+    <p xml:lang="pt">A Minuta grava as suas reuniões, registra quem disse o quê e escreve a ata. O reconhecimento de voz e as notas rodam no seu computador, então, por padrão, nada é enviado para fora.</p>
+    <p>It captures your microphone and the other side of the call on separate channels, tells the people on the call apart by their voice, and produces a summary, decisions, action items and open questions.</p>
+    <p xml:lang="pt">Ela captura o seu microfone e o outro lado da chamada em canais separados, distingue as pessoas da chamada pela voz e gera resumo, decisões, ações e perguntas em aberto.</p>
+    <ul>
+      <li>Record a call or import an audio or video file</li>
+      <li xml:lang="pt">Grave uma chamada ou importe um arquivo de áudio ou vídeo</li>
+      <li>Transcription with Whisper and voice separation, with a glossary per client</li>
+      <li xml:lang="pt">Transcrição com Whisper e separação de vozes, com glossário por cliente</li>
+      <li>Notes written by a small local model; an optional external assistant can be used instead</li>
+      <li xml:lang="pt">Ata escrita por um modelo local pequeno; um assistente externo pode ser usado, se você quiser</li>
+      <li>Search across all meetings, rename speakers, export to PDF, Word, Markdown and Obsidian</li>
+      <li xml:lang="pt">Busca em todas as reuniões, renomear falantes, exportar para PDF, Word, Markdown e Obsidian</li>
+      <li>Send action items to Trello; a queue writes notes in the background</li>
+      <li xml:lang="pt">Envie as ações para o Trello; uma fila escreve as atas em segundo plano</li>
+    </ul>
+    <p>The models (about 2 GB) are downloaded the first time you use the app. This version transcribes on the CPU; for NVIDIA graphics card acceleration use the .deb package from the project page.</p>
+    <p xml:lang="pt">Os modelos (cerca de 2 GB) são baixados na primeira vez que você usa o app. Esta versão transcreve na CPU; para a aceleração por placa NVIDIA, use o pacote .deb da página do projeto.</p>
+  </description>
+
+  <launchable type="desktop-id">io.github.bcocheto.Minuta.desktop</launchable>
+  <provides>
+    <binary>minuta</binary>
+    <binary>minuta-gui</binary>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/bcocheto/minuta/main/docs/screenshots/notes.png</image>
+      <caption>Minutes with summary, decisions and action items</caption>
+      <caption xml:lang="pt">Ata com resumo, decisões e ações</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/minuta/main/docs/screenshots/new-meeting.png</image>
+      <caption>Record a call or import a file</caption>
+      <caption xml:lang="pt">Grave uma chamada ou importe um arquivo</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/minuta/main/docs/screenshots/recording.png</image>
+      <caption>Recording with live transcript</caption>
+      <caption xml:lang="pt">Gravação com transcrição ao vivo</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/minuta/main/docs/screenshots/search.png</image>
+      <caption>Search across all meetings</caption>
+      <caption xml:lang="pt">Busca em todas as reuniões</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/minuta/main/docs/screenshots/queue.png</image>
+      <caption>Background queue</caption>
+      <caption xml:lang="pt">Fila em segundo plano</caption>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/bcocheto/minuta</url>
+  <url type="bugtracker">https://github.com/bcocheto/minuta/issues</url>
+  <url type="vcs-browser">https://github.com/bcocheto/minuta</url>
+  <url type="contact">https://github.com/bcocheto/minuta/issues</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#99c1f1</color>
+    <color type="primary" scheme_preference="dark">#1c71d8</color>
+  </branding>
+
+  <releases>
+    <release version="1.0.1" date="2026-11-10">
+      <description>
+        <p>Fixes an upgrade bug in install.sh; adds the light theme, renaming speakers in bulk and a keyboard shortcut to start and stop recording.</p>
+      </description>
+    </release>
+  </releases>
+</component>

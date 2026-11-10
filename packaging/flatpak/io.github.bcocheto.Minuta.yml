@@ -1,0 +1,68 @@
+# Flatpak manifest for Minuta.
+# Local test:
+#   flatpak run org.flatpak.Builder --user --install --force-clean ../../build-flatpak io.github.bcocheto.Minuta.yml
+#   flatpak run io.github.bcocheto.Minuta
+# For Flathub, replace the "dir" source of the last module with:
+#   - type: git
+#     url: https://github.com/bcocheto/minuta.git
+#     tag: v1.0.2
+#     commit: <commit of the tag>
+# Regenerate the pinned Python wheels with make-python-deps.sh.
+app-id: io.github.bcocheto.Minuta
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: minuta-gui
+
+finish-args:
+  - --share=ipc
+  - --share=network            # downloads the speech and language models once; Trello, if the user connects it
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio        # records the microphone and the call (a monitor of the output)
+  - --filesystem=xdg-documents # the notes (Documents/Minuta) and an Obsidian vault kept in Documents
+  - --talk-name=org.freedesktop.Notifications
+  - --env=MINUTA_PYTHON=/usr/bin/python3
+  - --env=MINUTA_LLAMA=/app/lib/minuta/llama/llama
+  - --env=MINUTA_PREFIX=/app/share/minuta
+
+modules:
+  # faster-whisper, ctranslate2, onnxruntime, sherpa-onnx, numpy, python-docx, reportlab and their
+  # dependencies, as wheels pinned by sha256 (ctranslate2, onnxruntime and sherpa-onnx ship binaries only)
+  - python-deps.json
+
+  # Language model runtime. Not tuned to the build machine's CPU, so it runs on any x86-64.
+  - name: llama-cpp
+    buildsystem: simple
+    build-commands:
+      - cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_NATIVE=OFF
+      - cmake --build build --target llama-app
+      - install -d /app/lib/minuta/llama
+      - install -m755 build/bin/llama /app/lib/minuta/llama/llama
+      - cp -a build/bin/*.so* /app/lib/minuta/llama/
+    sources:
+      - type: git
+        url: https://github.com/ggml-org/llama.cpp.git
+        tag: b12251
+        commit: 18c5a95e2b507a44bf0cbfc8abf997731a39ef87
+
+  - name: minuta
+    buildsystem: simple
+    build-commands:
+      - install -d /app/share/minuta /app/bin
+      - cp -r lib gui /app/share/minuta/
+      - find /app/share/minuta -name __pycache__ -type d -prune -exec rm -rf {} +
+      - install -Dm755 bin/minuta /app/bin/minuta
+      - printf '#!/bin/sh\nexec python3 /app/share/minuta/gui/minuta_gui.py "$@"\n' > /app/bin/minuta-gui
+      - chmod 755 /app/bin/minuta-gui
+      - install -Dm644 io.github.bcocheto.Minuta.desktop /app/share/applications/io.github.bcocheto.Minuta.desktop
+      - sed -i 's/^Icon=minuta/Icon=io.github.bcocheto.Minuta/' /app/share/applications/io.github.bcocheto.Minuta.desktop
+      - install -Dm644 packaging/flatpak/io.github.bcocheto.Minuta.metainfo.xml /app/share/metainfo/io.github.bcocheto.Minuta.metainfo.xml
+      - |
+        for sz in 16 22 24 32 48 64 128 256 512; do
+          install -Dm644 icons/${sz}x${sz}/minuta.png /app/share/icons/hicolor/${sz}x${sz}/apps/io.github.bcocheto.Minuta.png
+        done
+    sources:
+      - type: dir
+        path: ../..

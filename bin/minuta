@@ -64,8 +64,12 @@ if [[ -d "$_old_cfg" && ! -e "$_new_cfg" ]]; then
         && echo "minuta: moved your settings from $_old_cfg to $_new_cfg" >&2
 fi
 
-DATA_DIR="${MINUTA_HOME:-$HOME/.local/share/minuta}"
-OUT_DIR="${MINUTA_OUT:-$HOME/MeetingNotes}"
+DATA_DIR="${MINUTA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/minuta}"
+if [[ -n "${FLATPAK_ID:-}" ]]; then   # sandboxed: the notes go where the sandbox may write (Documents)
+    OUT_DIR="${MINUTA_OUT:-$(xdg-user-dir DOCUMENTS 2>/dev/null || echo "$HOME/Documents")/Minuta}"
+else
+    OUT_DIR="${MINUTA_OUT:-$HOME/MeetingNotes}"
+fi
 # Settings live in ~/.config/minuta/config as key=value lines. Environment
 # variables win over the file; see `minuta config`.
 CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/minuta/config"
@@ -776,6 +780,11 @@ cmd_toggle() {
 }
 
 cmd_shortcut() {
+    if [[ -n "${FLATPAK_ID:-}" ]]; then
+        echo "A sandboxed app cannot create system shortcuts. In Settings > Keyboard > Custom Shortcuts, add one that runs:" >&2
+        echo "  flatpak run --command=minuta $FLATPAK_ID toggle" >&2
+        return 1
+    fi
     local self; self="$(command -v minuta 2>/dev/null || readlink -f "${BASH_SOURCE[0]}")"
     case "${1:-show}" in
         show)   python3 -I "$PREFIX/lib/shortcut.py" show ;;
