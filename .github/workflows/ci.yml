@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for a test build of the .deb (nothing is released)"
+        default: "0.0.0-test"
+
+permissions:
+  contents: read
+
+env:
+  # Pinned so builds are reproducible; bump it on purpose. Verified to have the `llama-app` target.
+  LLAMA_CPP_REF: b12251
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install what the tests need
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg python3-pip
+      - name: Unit tests
+        run: python3 -B -m unittest discover -s tests -v
+
+  deb:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write   # to attach the .deb to the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential cmake git patchelf fakeroot lintian
+
+      - name: Restore the llama.cpp runtime
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: llama-runtime
+          key: llama-runtime-${{ env.LLAMA_CPP_REF }}-ubuntu22-portable
+
+      - name: Build the llama.cpp runtime (CPU, portable)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "$LLAMA_CPP_REF" https://github.com/ggml-org/llama.cpp
+          cd llama.cpp
+          # GGML_NATIVE=OFF: do not tune for this runner's CPU, so the binary runs on any x86-64
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_NATIVE=OFF
+          cmake --build build -j"$(nproc)" --target llama-app
+          mkdir -p ../llama-runtime
+          cp build/bin/llama build/bin/*.so* ../llama-runtime/
+
+      - name: Build the .deb
+        run: |
+          VER="${{ steps.ver.outputs.v }}"
+          # keep the man page and the control file in step with the tag
+          sed -i "s/\"minuta [0-9][^\"]*\"/\"minuta $VER\"/" packaging/minuta.1
+          LLAMA_DIR="$PWD/llama-runtime" VER="$VER" bash packaging/build-deb.sh
+          dpkg-deb -I "dist/minuta_${VER}_amd64.deb" | grep -E "Package|Version"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minuta-deb
+          path: dist/minuta_*_amd64.deb
+
+      - name: Attach to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${{ steps.ver.outputs.v }}"
+          f="dist/minuta_${VER}_amd64.deb"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$f" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$f" --title "Minuta $VER" --generate-notes
+          fi
