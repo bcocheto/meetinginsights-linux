@@ -61,9 +61,15 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli("delete", "2026-11-10_11-00_depois").returncode, 0)
         self.assertFalse((rec / "2026-11-10_11-00_depois.meta").exists())
 
+    def test_finish_needs_a_queued_recording(self):
+        r = self.run_cli("finish", "2026-11-10_11-00_nada")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("nothing to finish", r.stderr)
+        self.assertNotEqual(self.run_cli("finish").returncode, 0)
+
     def test_help_mentions_the_new_commands(self):
         out = self.run_cli("help").stdout
-        for word in ("--focus", "client", "recover"):
+        for word in ("--focus", "client", "recover", "--capture-only"):
             self.assertIn(word, out)
 
 

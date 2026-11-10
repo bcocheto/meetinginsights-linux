@@ -7,6 +7,7 @@ transcription and note writing — happens on this machine; nothing is uploaded.
 """
 import html
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -103,6 +104,10 @@ STRINGS = {
         "Client (optional)": "Cliente (opcional)",
         "What matters in this meeting? (optional)": "O que importa nesta reunião? (opcional)",
         "Glossary": "Glossário",
+        "Finishing the recording…": "Finalizando a gravação…",
+        "Processing: {name}": "Processando: {name}", "Waiting to process": "Aguardando para processar",
+        "{n} waiting": "{n} na fila", "Unfinished recording": "Gravação não concluída",
+        "Could not stop the recording": "Não foi possível parar a gravação",
         "Microphone": "Microfone", "Call audio": "Áudio da chamada",
         "The microphone is not picking up anything. Check that it is plugged in, "
         "not muted, and selected in Sound settings.":
@@ -620,6 +625,16 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.listbox.set_filter_func(self._filter_row)
         sw.add(self.listbox)
         side.pack_start(sw, True, True, 0)
+        self.queue_box = Gtk.Box(spacing=8)
+        self.queue_box.set_margin_start(14); self.queue_box.set_margin_end(14)
+        self.queue_box.set_margin_top(8); self.queue_box.set_margin_bottom(4)
+        self.queue_spin = Gtk.Spinner()
+        self.queue_lbl = Gtk.Label(label="", xalign=0, wrap=True)
+        self.queue_lbl.get_style_context().add_class("dim-label")
+        self.queue_box.pack_start(self.queue_spin, False, False, 0)
+        self.queue_box.pack_start(self.queue_lbl, True, True, 0)
+        self.queue_box.show_all(); self.queue_box.set_no_show_all(True); self.queue_box.hide()
+        side.pack_start(self.queue_box, False, False, 0)
         self.settings_btn = Gtk.Button()
         self.settings_btn.get_style_context().add_class("nav")
         sb = Gtk.Box(spacing=10)
@@ -827,12 +842,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             return
         if not self.is_ready() and not self.run_setup():
             return
-        self.set_mode("busy", T("Transcribing…"))
-
-        def work():
-            r = self.cli("import", path, *self._meta_args())
-            GLib.idle_add(self._stop_done, r)
-        threading.Thread(target=work, daemon=True).start()
+        self.submit_job(Path(path).stem, ("import", path, *self._meta_args()), self._stop_done)
 
     def on_new_meeting(self):
         if self.mode != "idle":
@@ -875,7 +885,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         self.meters = Gtk.Box(spacing=14)
         self.meters.pack_start(mic_box, False, False, 0)
         self.meters.pack_start(sys_box, False, False, 0)
-        self.meters.set_no_show_all(True)
+        self.meters.show_all(); self.meters.set_no_show_all(True); self.meters.hide()
         bar.pack_start(self.meters, False, False, 0)
         self.stop_btn = Gtk.Button(label=T("Stop"))
         self.stop_btn.get_style_context().add_class("quiet")
@@ -929,7 +939,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         base = self.current_base()
         if not base:
             return True
-        self.meters.show_all()
+        self.meters.show()
         now = time.time()
         if getattr(self, "_watch", None) is None or self._watch_base != str(base):
             self._watch_base = str(base)
@@ -1007,12 +1017,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         d.add_button(T("Process now"), Gtk.ResponseType.OK)
         resp = d.run(); d.destroy()
         if resp == Gtk.ResponseType.OK:
-            self.set_mode("busy", T("Transcribing…"))
-
-            def work():
-                r = self.cli("recover")
-                GLib.idle_add(self._stop_done, r)
-            threading.Thread(target=work, daemon=True).start()
+            self.submit_job(T("Unfinished recording"), ("recover",), self._stop_done)
         return False
 
     def _first_run_check(self, force=False):
@@ -1031,8 +1036,51 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
         return ready
 
     # ---------- state ----------
-    def cli(self, *args):
-        return subprocess.run([CLI, *args], capture_output=True, text=True, timeout=900)
+    def cli(self, *args, timeout=900):
+        return subprocess.run([CLI, *args], capture_output=True, text=True, timeout=timeout)
+
+    # ---------- background jobs: transcribing and writing notes never block the window ----------
+    def submit_job(self, label, args, on_done):
+        """Queue a CLI command; jobs run one at a time, in order, while the app stays usable."""
+        if not hasattr(self, "_jobq"):
+            self._jobq, self._job_waiting, self._job_cur = queue.Queue(), [], None
+            threading.Thread(target=self._job_worker, daemon=True).start()
+        self._job_waiting.append(label)
+        self._jobq.put((label, args, on_done))
+        self._refresh_queue()
+
+    def _job_worker(self):
+        while True:
+            label, args, on_done = self._jobq.get()
+            try:
+                self._job_waiting.remove(label)
+            except ValueError:
+                pass
+            self._job_cur = label
+            GLib.idle_add(self._refresh_queue)
+            try:
+                r = self.cli(*args, timeout=None)
+            except Exception as e:  # noqa: BLE001 - report it instead of killing the worker
+                r = subprocess.CompletedProcess(args, 1, "", str(e))
+            self._job_cur = None
+            GLib.idle_add(self._job_finished, on_done, r)
+
+    def _job_finished(self, on_done, r):
+        self._refresh_queue()
+        on_done(r)
+        return False
+
+    def _refresh_queue(self):
+        cur, waiting = getattr(self, "_job_cur", None), list(getattr(self, "_job_waiting", []))
+        if cur or waiting:
+            text = T("Processing: {name}", name=cur) if cur else T("Waiting to process")
+            if waiting:
+                text += "  ·  " + T("{n} waiting", n=len(waiting))
+            self.queue_lbl.set_text(text)
+            self.queue_spin.start(); self.queue_box.show()
+        else:
+            self.queue_spin.stop(); self.queue_box.hide()
+        return False
 
     def poll_state(self):
         r = self.cli("status")
@@ -1093,7 +1141,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
     # ---------- actions ----------
     def on_record(self):
         if self.mode == "recording":
-            self.set_mode("busy", T("Transcribing…"))
+            self.set_mode("busy", T("Finishing the recording…"))
             threading.Thread(target=self._stop_worker, daemon=True).start()
         elif self.mode == "idle":
             if not self.is_ready() and not self.run_setup():
@@ -1108,16 +1156,27 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
                 self.error_dialog(T("Could not start recording"), r.stderr or r.stdout)
 
     def _stop_worker(self):
-        r = self.cli("stop")
-        GLib.idle_add(self._stop_done, r)
+        r = self.cli("stop", "--capture-only")
+        GLib.idle_add(self._captured, r)
+
+    def _captured(self, r):
+        """The audio is safe; the window is free again while the notes are made."""
+        self._live_text = None
+        self.set_mode("idle")
+        m = re.search(r"Queued: (\S+)", r.stdout)
+        if r.returncode != 0 or not m:
+            self.error_dialog(T("Could not stop the recording"), (r.stderr or r.stdout)[-800:])
+            return False
+        name = m.group(1)
+        self.submit_job(re.sub(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}_", "", name),
+                        ("finish", name), self._stop_done)
+        return False
 
     def _stop_done(self, r):
-        self.set_mode("idle")
-        self._live_text = None
         self.load_meetings()
         if r.returncode == 0:
             self.notify(T("Notes ready"), T("Meeting notes have been written."))
-            if self.listbox.get_row_at_index(0):
+            if self.mode == "idle" and self.listbox.get_row_at_index(0):   # never pull the view off a live recording
                 self.listbox.select_row(self.listbox.get_row_at_index(0))
         else:
             self.error_dialog(T("Recording processed with errors"), (r.stderr or r.stdout)[-800:])
@@ -1271,15 +1330,10 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             b.set_sensitive(enabled)
 
     def _run_action(self, busy_text, *args, then_select=None):
-        self.set_mode("busy", T(busy_text))
-
-        def work():
-            r = self.cli(*args)
-            GLib.idle_add(self._action_done, r, then_select)
-        threading.Thread(target=work, daemon=True).start()
+        label = f"{T(busy_text).rstrip('…')} · " + re.sub(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}_", "", args[1] if len(args) > 1 else "")
+        self.submit_job(label, args, lambda r: self._action_done(r, then_select))
 
     def _action_done(self, r, then_select):
-        self.set_mode("idle")
         if r.returncode != 0:
             self.error_dialog(T("The action failed"), (r.stderr or r.stdout)[-800:])
         keep = then_select
@@ -1288,7 +1342,7 @@ class MeetingInsightsWindow(Gtk.ApplicationWindow):
             keep = m.group(1) if m else (self.selected.stem if self.selected else None)
         self.selected = None
         self.load_meetings()
-        if keep:
+        if keep and self.mode == "idle":
             for row in self.listbox.get_children():
                 if getattr(row, "path", None) and row.path.stem == keep:
                     self.listbox.select_row(row)

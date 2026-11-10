@@ -4,7 +4,8 @@
 #   meetinginsights start "Sprint planning" [--client NAME] [--focus "what matters"]
 #                                             begin recording (microphone + system audio)
 #   meetinginsights client [list|show|set|rm] NAME [terms...]   per-client glossary for names and terms
-#   meetinginsights stop                      stop, transcribe, write notes
+#   meetinginsights stop [--capture-only]     stop, transcribe, write notes (--capture-only: just stop
+#                                             recording; finish later with: meetinginsights finish <name>)
 #   meetinginsights status                    show whether a recording is running
 #   meetinginsights recover [--list]          finish a recording that was cut short and process any left without notes
 #   meetinginsights notes <transcript.txt>    (re)generate notes from a transcript
@@ -483,41 +484,62 @@ cmd_recover() { # recover [--list]
         if [[ ! -s "$DATA_DIR/rec/$name.wav" ]]; then
             need ffmpeg; _merge_channels "$DATA_DIR/rec/$name"
         fi
-        cmd_reprocess "$name" || true; did=1
+        if [[ -f "$DATA_DIR/rec/$name.job" ]]; then _finish_recording "$name" || true
+        else cmd_reprocess "$name" || true; fi
+        did=1
     done < <(_pending_names)
     (( did )) || echo "Nothing to recover."
 }
 
-cmd_stop() {
+cmd_stop() { # stop [--capture-only]
     [[ -f "$STATE" ]] || die "not recording"
+    local capture_only=0; [[ "${1:-}" == "--capture-only" ]] && capture_only=1
     local base title started
     { read -r base; read -r title; read -r started; } < "$STATE"
     _meta_load "$base"; _meta_env
 
-    local p f
+    local p f live_pid=""
     for p in mic sys; do
         f="$DATA_DIR/.$p.pid"
         [[ -f "$f" ]] && { _is_parec "$(cat "$f")" && kill "$(cat "$f")" 2>/dev/null; rm -f "$f"; }
     done
+    # take the live transcriber's pid now: a new recording may start before we finish
+    [[ -f "$DATA_DIR/.live.pid" ]] && { live_pid=$(cat "$DATA_DIR/.live.pid"); rm -f "$DATA_DIR/.live.pid"; }
     sleep 1; rm -f "$STATE"
 
     local mins=$(( ($(date +%s) - started) / 60 ))
     echo "Stopped after ${mins}m. Merging channels..."
     _merge_channels "$base"
+    touch "$base.stop"      # tells the live transcriber to wrap up
+    printf '%s\n%s\n%s\n' "$title" "$mins" "$live_pid" > "$base.job"
 
-    local live_pid="" used_live=0
-    [[ -f "$DATA_DIR/.live.pid" ]] && { live_pid=$(cat "$DATA_DIR/.live.pid"); rm -f "$DATA_DIR/.live.pid"; }
+    if (( capture_only )); then
+        echo "Queued: $(basename "$base")"; return 0
+    fi
+    _finish_recording "$(basename "$base")"
+}
+
+# Everything after the capture: wait for the live transcript, tell voices apart, write the notes.
+_finish_recording() { # _finish_recording <name>
+    local base="$DATA_DIR/rec/$1" title mins live_pid used_live=0
+    [[ -f "$base.job" ]] || die "nothing to finish for: $1"
+    { read -r title; read -r mins; read -r live_pid; } < "$base.job"
+    _meta_load "$base"; _meta_env
+    mins="${mins:-?}"
+
+    local waited_on_live=0
     if [[ -n "$live_pid" ]] && kill -0 "$live_pid" 2>/dev/null; then
         echo "Finishing transcription (most of it was done during the meeting)..."
-        touch "$base.stop"
+        waited_on_live=1
         local waited=0
         while kill -0 "$live_pid" 2>/dev/null && (( waited < 600 )); do
             sleep 2; waited=$((waited + 2))
         done
         kill "$live_pid" 2>/dev/null
-        if [[ -s "$base.partial.txt" ]]; then
-            mv "$base.partial.txt" "$base.txt"; used_live=1
-        fi
+    fi
+    # trust the live transcript only if the worker finished (or we just waited for it)
+    if [[ -s "$base.partial.txt" ]] && { [[ -f "$base.live.done" ]] || (( waited_on_live )); }; then
+        mv "$base.partial.txt" "$base.txt"; used_live=1
     fi
     rm -f "$base.stop" "$base.live.done" "$base.partial.txt"
 
@@ -533,13 +555,15 @@ cmd_stop() {
         echo "No speech was recognised in this recording." >&2
         [[ -n "$diag" ]] && echo "$diag" >&2
         echo "The audio is kept at $base.wav if you want to try again." >&2
-        touch "$base.nospeech"
+        touch "$base.nospeech"; rm -f "$base.job"
         return 1
     fi
 
     _voice_prefixes; _split_voices "$base.wav" "$base.txt" "$THEM_LABEL" "$_p_part"
-    cmd_notes "$base.txt" "$title" "$mins"
+    if cmd_notes "$base.txt" "$title" "$mins"; then rm -f "$base.job"; else return 1; fi
 }
+
+cmd_finish() { [[ -n "${1:-}" ]] || die "usage: meetinginsights finish <name>"; _finish_recording "$1"; }
 
 cmd_notes() {
     local transcript="$1" title="${2:-meeting}" mins="${3:-?}"
@@ -739,7 +763,7 @@ cmd_delete() {
 
 case "${1:-}" in
     start)  shift; cmd_start "$@" ;;
-    stop)   cmd_stop ;;
+    stop)   shift; cmd_stop "$@" ;;
     status) cmd_status ;;
     ready)  cmd_ready ;;
     setup)  shift; cmd_setup "$@" ;;
@@ -748,12 +772,13 @@ case "${1:-}" in
     export) shift; cmd_export "$@" ;;
     import) shift; cmd_import "$@" ;;
     delete) shift; cmd_delete "$@" ;;
+    finish) shift; cmd_finish "$@" ;;
     recover) shift; cmd_recover "$@" ;;
     client) shift; cmd_client "$@" ;;
     providers) cmd_providers ;;
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: meetinginsights notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,26p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,27p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: meetinginsights help)" ;;
 esac
