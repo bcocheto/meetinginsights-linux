@@ -1,4 +1,4 @@
-.TH MEETINGINSIGHTS 1 "2026" "meetinginsights 0.1.0" "User Commands"
+.TH MEETINGINSIGHTS 1 "2026" "meetinginsights 0.4.0" "User Commands"
 .SH NAME
 meetinginsights \- record meetings and write minutes, entirely on device
 .SH SYNOPSIS
@@ -7,12 +7,14 @@ meetinginsights \- record meetings and write minutes, entirely on device
 .RI [ arguments ]
 .SH DESCRIPTION
 Records the microphone and system audio as separate channels, transcribes each
-locally with faster-whisper, and writes structured minutes with a small local
-language model. No audio or transcript leaves the machine and no API key is used.
+locally with faster-whisper, and writes structured minutes with a local language
+model. By default no audio or transcript leaves the machine and no API key is used;
+writing the minutes with Claude Code or Gemini CLI is opt-in and sends the transcript
+to that service.
 .PP
 Because the microphone is captured to the left channel and system audio to the
-right, speaker attribution comes from audio routing rather than a diarization
-model, and action-item owners are read off the transcript.
+right, "You" comes from audio routing; the voices on the far end are told apart by an
+offline diarization model. Action-item owners are read off the transcript labels.
 .SH COMMANDS
 .TP
 .B setup
@@ -21,11 +23,41 @@ Prepare the Python environment and download the speech and language models
 to do this for you on first launch, so this is only needed for headless use.
 Pass \fB--porcelain\fR to emit machine-readable progress.
 .TP
-.BI "start " title
+.BI "start " title " [--client " name "] [--focus " text ]
 Begin recording. Prints a reminder to tell participants they are being recorded.
+\fB--client\fR applies that client's saved glossary; \fB--focus\fR says what matters
+in this meeting and adds an "In focus" section to the minutes.
 .TP
-.B stop
-Stop recording, then transcribe and write the minutes.
+.B stop " [--capture-only]"
+Stop recording, then transcribe and write the minutes. With \fB--capture-only\fR
+only the audio is saved; finish later with \fBfinish\fR.
+.TP
+.BI finish " name"
+Transcribe and write the minutes for a recording stopped with \fB--capture-only\fR.
+.TP
+.B recover " [--list]"
+Finish a recording that was cut short and process audio left without minutes.
+.TP
+.BI "import " file " [title]"
+Transcribe an existing audio or video file and write the minutes.
+.TP
+.BI "client [list|show|set|rm] " name " [terms]"
+Keep a glossary of names and terms for a client.
+.TP
+.BI "reprocess " name
+Transcribe again and rewrite the minutes (\fB--notes-only\fR to skip transcription).
+.TP
+.BI "rename " name " title"
+Rename a meeting.
+.TP
+.BI "export " name " md|docx|pdf"
+Export the minutes and transcript.
+.TP
+.BI "delete " name
+Delete a meeting's minutes, transcript and audio.
+.TP
+.BI "config [" key " [" value "]]"
+Show or set a setting (whisper_model, notes_model, notes_provider, whisper_device, diarize, ...).
 .TP
 .B status
 Report whether a recording is in progress.
@@ -43,7 +75,7 @@ Regenerate minutes from an existing transcript file.
 Directory for the written minutes. Default ~/MeetingNotes.
 .TP
 .B MEETINGINSIGHTS_WHISPER_MODEL
-faster-whisper model name. Default small.en; medium.en is more accurate and slower.
+faster-whisper model name (small, medium, large-v3-turbo). Default: large-v3-turbo when the GPU libraries are installed, else small.
 .TP
 .B MEETINGINSIGHTS_LLM_MODEL
 Path to a GGUF chat model used for the prose summaries.
@@ -61,4 +93,4 @@ Recordings and transcripts.
 Recording a conversation without informing the other participants is unlawful
 in many jurisdictions. Please obtain consent.
 .SH SEE ALSO
-Project page: https://github.com/techbysaurabh/meetinginsights-linux
+Project page: https://github.com/bcocheto/meetinginsights-linux
