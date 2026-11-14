@@ -247,6 +247,33 @@ STRINGS = {
             "Refaz a ata a partir da transcrição atual (use depois de editá-la)",
         "Transcribes the audio again with the current language and model":
             "Transcreve o áudio de novo com o idioma e o modelo atuais",
+        "Join parts…": "Juntar partes…",
+        "Join parts of a meeting": "Juntar partes de uma reunião",
+        "Tick the recordings that are parts of the same meeting and put them in the order they happened. A new meeting is created; the originals are kept as they are.":
+            "Marque as gravações que são partes da mesma reunião e coloque-as na ordem em que aconteceram. Uma nova reunião é criada; os originais ficam como estão.",
+        "Speaker names stay separate per part (Speaker 1 (part 2)). Use Speakers afterwards to say two are the same person.":
+            "Os nomes dos falantes ficam separados por parte (Falante 1 (parte 2)). Use Falantes depois para dizer que dois são a mesma pessoa.",
+        "Title of the joined meeting": "Título da reunião unida",
+        "Join": "Juntar",
+        "Move up": "Subir",
+        "Move down": "Descer",
+        "Include {name}": "Incluir {name}",
+        "Move {name} up": "Subir {name}",
+        "Move {name} down": "Descer {name}",
+        "no notes yet": "sem ata ainda",
+        "Joining parts…": "Juntando partes…",
+        "Join failed": "Não foi possível juntar",
+        "Not enough recordings with a transcript to join.": "Não há gravações com transcrição suficientes para juntar.",
+        "Not processed yet": "Ainda não processada",
+        "⏳ being processed": "⏳ em processamento",
+        "Being processed": "Em processamento",
+        "Another Minuta job is working on this recording. It will appear here when it is done.":
+            "Outra tarefa do Minuta está trabalhando nesta gravação. Ela aparece aqui quando terminar.",
+        "⚠ not processed": "⚠ não processada",
+        "This recording has a transcript but no notes yet. Use “Rewrite notes” to write them.":
+            "Esta gravação tem transcrição, mas ainda não tem ata. Use “Refazer a ata” para escrevê-la.",
+        "This recording has audio but no transcript yet. Use “Transcribe again” to process it.":
+            "Esta gravação tem áudio, mas ainda não tem transcrição. Use “Transcrever de novo” para processá-la.",
     },
 }
 
@@ -268,6 +295,7 @@ for _lib in (Path(__file__).resolve().parent.parent / "lib", Path("/usr/share/mi
         sys.path.insert(0, str(_lib)); break
 import levels  # noqa: E402
 import search as msearch  # noqa: E402
+import merge as mmerge  # noqa: E402
 
 DATA_DIR = Path(os.environ.get("MINUTA_HOME", DATA_HOME / "minuta"))
 LANG_FILE = Path(os.environ.get("XDG_CONFIG_HOME", HOME / ".config")) / "minuta" / "language"
@@ -290,64 +318,14 @@ except (OSError, subprocess.SubprocessError):
 # Same visual language as Gavetta, Clima and Cadência: neutral surface, GNOME blue
 # accent, rounded cards (12px), pill inputs and chips, hairline borders. Dark or light
 # follows the system (org.gnome.desktop.interface color-scheme); MINUTA_THEME overrides.
-THEME_DARK = {
-    "bg":            "#222226",
-    "bg_bar":        "#1c1c20",
-    "surface":       "rgba(255,255,255,0.055)",
-    "surface_hover": "rgba(255,255,255,0.10)",
-    "field":         "rgba(255,255,255,0.07)",
-    "hairline":      "rgba(255,255,255,0.10)",
-    "accent":        "#3584e4",
-    "accent_soft":   "#62a0ea",
-    "text_primary":  "#f2f2f2",
-    "text_secondary":"rgba(255,255,255,0.55)",
-    "danger":        "#e01b24",
-    "warn":          "#f5c211",
-    "ok":            "#57e389",
-    "cloud":         "#ffa348",
-    "ink":           "255,255,255",
-    "strong":        "#ffffff",
-}
-THEME_LIGHT = {
-    "bg":            "#fafafb",
-    "bg_bar":        "#f0f0f3",
-    "surface":       "rgba(0,0,0,0.045)",
-    "surface_hover": "rgba(0,0,0,0.08)",
-    "field":         "rgba(0,0,0,0.05)",
-    "hairline":      "rgba(0,0,0,0.12)",
-    "accent":        "#3584e4",
-    "accent_soft":   "#1c71d8",
-    "text_primary":  "#241f31",
-    "text_secondary":"rgba(0,0,0,0.58)",
-    "danger":        "#c01c28",
-    "warn":          "#b8860b",
-    "ok":            "#1a7f4b",
-    "cloud":         "#b85c00",
-    "ink":           "0,0,0",
-    "strong":        "#000000",
-}
+import theme as _theme  # noqa: E402
 
-
-def system_is_dark() -> bool:
-    forced = os.environ.get("MINUTA_THEME", "").lower()
-    if forced in ("dark", "light"):
-        return forced == "dark"
-    try:
-        out = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
-                             capture_output=True, text=True, timeout=3).stdout
-        return "light" not in out
-    except (OSError, subprocess.SubprocessError):
-        return True
-
-
-IS_DARK = system_is_dark()
-THEME = THEME_DARK if IS_DARK else THEME_LIGHT
+IS_DARK = _theme.system_is_dark(os.environ.get("MINUTA_THEME", ""))
+THEME = _theme.build(IS_DARK, _theme.system_accent(os.environ.get("MINUTA_ACCENT", "")))
 
 
 def themed(css: str) -> str:
-    """Fill the %(token)s placeholders; overlays written as white become black on light."""
-    css = css.replace("rgba(255,255,255,", "rgba(%(ink)s,").replace("rgba(255, 255, 255, ", "rgba(%(ink)s, ")
-    return re.sub(r"%\((\w+)\)s", lambda m: THEME[m.group(1)], css)
+    return _theme.themed(css, THEME)
 
 
 _CSS_SRC = """
@@ -392,10 +370,10 @@ combobox button.combo {
 combobox button.combo:hover { background: %(surface_hover)s; }
 
 button.loud {
-  background: %(accent)s; color: #ffffff; border: none; box-shadow: none;
+  background: %(accent_btn)s; color: %(accent_fg)s; border: none; box-shadow: none;
   border-radius: 999px; padding: 10px 34px; font-weight: 700;
 }
-button.loud:hover { background: %(accent_soft)s; }
+button.loud:hover { background: %(accent_btn_hover)s; }
 button.quiet {
   background: %(surface)s; color: %(text_primary)s;
   border: 1px solid %(hairline)s; border-radius: 999px; box-shadow: none;
@@ -423,9 +401,9 @@ list row:selected { background: alpha(%(accent)s, 0.22); border-color: alpha(%(a
   padding: 7px 20px; color: %(text_secondary)s; font-weight: 600;
 }
 .segment button:hover { color: %(text_primary)s; }
-.segment button.active { background: rgba(255,255,255,0.10); color: %(text_primary)s; }
+.segment button.active, .segment button.active:hover { background: %(accent_btn)s; color: %(accent_fg)s; }
 .dropzone {
-  border: 1.5px dashed %(hairline)s; border-radius: 18px; padding: 34px 28px;
+  border: 1.5px dashed %(hairline)s; border-radius: 18px; padding: 28px 24px;
 }
 eventbox:hover .dropzone { border-color: %(accent_soft)s; }
 
@@ -440,8 +418,20 @@ button.chip {
   border: none; box-shadow: none;
 }
 button.chip:hover { background: rgba(255,255,255,0.15); color: %(strong)s; }
-button.chip.danger:hover { background: alpha(%(danger)s, 0.60); color: #ffffff; }
+button.chip.danger { margin-left: 6px; }
+button.chip.danger:hover { background: %(danger_btn)s; color: #ffffff; }
 button.chip:disabled { color: alpha(%(text_secondary)s, 0.5); }
+
+/* keyboard focus: a visible ring on every control (the flat styles above drop the default one) */
+button:focus, combobox button.combo:focus { box-shadow: inset 0 0 0 2px %(accent_soft)s; }
+button.loud:focus, button.suggested-action:focus, .segment button.active:focus { box-shadow: inset 0 0 0 2px %(accent_fg)s; }
+list row:focus { border-color: %(accent_soft)s; }
+/* switches and checkboxes follow the accent too (the GTK theme would use its own) */
+switch:checked { background: %(accent_btn)s; border-color: %(accent_btn)s; color: %(accent_fg)s; }
+check:checked, radio:checked { background: %(accent_btn)s; border-color: %(accent_btn)s; color: %(accent_fg)s; }
+checkbutton:focus check, switch:focus { box-shadow: 0 0 0 2px %(accent_soft)s; }
+textview:focus, spinbutton:focus { border-color: %(accent_soft)s; }
+button.chip.danger:focus { box-shadow: inset 0 0 0 2px #ffffff; }
 
 dialog, messagedialog { background: %(bg)s; color: %(text_primary)s; }
 dialog .dialog-action-area button, messagedialog .dialog-action-area button {
@@ -450,9 +440,9 @@ dialog .dialog-action-area button, messagedialog .dialog-action-area button {
 }
 dialog .dialog-action-area button:hover, messagedialog .dialog-action-area button:hover { background: %(surface_hover)s; }
 dialog .dialog-action-area button.suggested-action, messagedialog .dialog-action-area button.suggested-action {
-  background: %(accent)s; color: #ffffff; border: none;
+  background: %(accent_btn)s; color: %(accent_fg)s; border: none;
 }
-dialog .dialog-action-area button.suggested-action:hover, messagedialog .dialog-action-area button.suggested-action:hover { background: %(accent_soft)s; }
+dialog .dialog-action-area button.suggested-action:hover, messagedialog .dialog-action-area button.suggested-action:hover { background: %(accent_btn_hover)s; }
 """
 CSS = themed(_CSS_SRC).encode()
 
@@ -479,7 +469,7 @@ a { color:%(accent_soft)s; }
 pre { background:rgba(255,255,255,.05); border-radius:12px; padding:12px 14px; }
 .turn { margin: 0 0 16px; }
 .who { font-weight: 700; font-size: 13px; }
-.ts { font-weight: 400; font-size: 11px; margin-left: 8px; color: rgba(255,255,255,.38);
+.ts { font-weight: 400; font-size: 11px; margin-left: 8px; color: rgba(255,255,255,.55);
       font-variant-numeric: tabular-nums; }
 .say { margin: 3px 0 0; padding: 1px 0 1px 12px; border-left: 2px solid var(--c); color: %(text_primary)s; }
 em { color: rgba(255,255,255,.6); }
@@ -494,16 +484,22 @@ def transcript_html(text: str) -> str:
     """The transcript as a conversation: consecutive lines from one speaker are merged."""
     turns = []
     for line in text.splitlines():
-        m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
+        if line.startswith("— ") and line.rstrip().endswith(" —"):      # where a joined part begins
+            turns.append(["", None, line.strip("— ").strip()])
+            continue
+        m = re.match(r"\[(\d{1,3}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
         if not m:
             continue
         t, who, say = m.group(1), m.group(2).strip(), m.group(3).strip()
-        if turns and turns[-1][1] == who:
+        if turns and turns[-1][1] == who and who is not None:
             turns[-1][2] += " " + say
         else:
             turns.append([t, who, say])
     colors, parts = {}, []
     for t, who, say in turns:
+        if who is None:
+            parts.append(f'<h3>{html.escape(say)}</h3>')
+            continue
         c = colors.setdefault(who, SPEAKER_COLORS[len(colors) % len(SPEAKER_COLORS)])
         parts.append(f'<div class="turn" style="--c:{c}"><div class="who" style="color:{c}">'
                      f'{html.escape(who)}<span class="ts">{t}</span></div>'
@@ -722,6 +718,15 @@ class MinutaWindow(Gtk.ApplicationWindow):
         self.new_btn.add(nb)
         self.new_btn.connect("clicked", lambda *_: self.on_new_meeting())
         side.pack_start(self.new_btn, False, False, 0)
+        self.join_btn = Gtk.Button()
+        self.join_btn.get_style_context().add_class("nav")
+        jb = Gtk.Box(spacing=10)
+        jb.pack_start(Gtk.Image.new_from_icon_name("list-add-symbolic", Gtk.IconSize.MENU), False, False, 0)
+        jb.pack_start(Gtk.Label(label=T("Join parts…"), xalign=0), False, False, 0)
+        self.join_btn.add(jb)
+        self.join_btn.set_tooltip_text(T("Join parts of a meeting"))
+        self.join_btn.connect("clicked", lambda *_: self.on_join())
+        side.pack_start(self.join_btn, False, False, 0)
         recents = Gtk.Label(label=T("RECENTS"), xalign=0)
         recents.get_style_context().add_class("section-label")
         side.pack_start(recents, False, False, 0)
@@ -788,10 +793,15 @@ class MinutaWindow(Gtk.ApplicationWindow):
     # ---------- the "new meeting" page: record or import ----------
     def _build_new_page(self):
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        outer.set_margin_start(20); outer.set_margin_end(20)
+        outer.set_margin_top(20); outer.set_margin_bottom(20)
         col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
-        col.set_size_request(520, -1)
+        col.set_size_request(0, -1)
+        col.set_hexpand(False)
         col.set_halign(Gtk.Align.CENTER); col.set_valign(Gtk.Align.CENTER)
-        outer.pack_start(col, True, False, 0)
+        # Keep the page's natural height inside the scroller so a short window can
+        # scroll instead of clipping the language and advanced-option controls.
+        outer.pack_start(col, False, False, 0)
 
         seg = Gtk.Box(spacing=2)
         seg.get_style_context().add_class("segment")
@@ -850,10 +860,18 @@ class MinutaWindow(Gtk.ApplicationWindow):
         col.pack_start(self.new_stack, False, False, 0)
 
         # per-meeting context, shared by recording and importing
-        ctxbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        crow = Gtk.Box(spacing=8)
-        self.client_box = Gtk.ComboBoxText.new_with_entry()
-        self.client_box.get_child().set_placeholder_text(T("Client (optional)"))
+        ctxbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        crow = Gtk.Box(spacing=12)
+        # An editable combo puts its arrow button over the entry's right edge in some
+        # GTK themes. Use the native entry completion instead: clients remain selectable
+        # while arbitrary names still work, and the glossary action gets its own space.
+        self.client_box = Gtk.Entry(placeholder_text=T("Client (optional)"))
+        self.client_store = Gtk.ListStore(str)
+        completion = Gtk.EntryCompletion()
+        completion.set_model(self.client_store)
+        completion.set_text_column(0)
+        completion.set_inline_completion(True)
+        self.client_box.set_completion(completion)
         crow.pack_start(self.client_box, True, True, 0)
         self.gloss_btn = Gtk.Button(label=T("Glossary"))
         self.gloss_btn.get_style_context().add_class("nav")
@@ -866,7 +884,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
         col.pack_start(ctxbox, False, False, 0)
         self.refresh_clients()
 
-        opts = Gtk.Box(spacing=12)
+        opts = Gtk.Box(spacing=16)
         opts.set_halign(Gtk.Align.CENTER)
         self.lang_box = Gtk.ComboBoxText()
         self.lang_box.set_tooltip_text(T("Spoken language of the meeting"))
@@ -881,22 +899,26 @@ class MinutaWindow(Gtk.ApplicationWindow):
         opts.pack_start(more, False, False, 0)
         col.pack_start(opts, False, False, 0)
         self._set_new_mode("record")
-        return outer
+        scroll = Gtk.ScrolledWindow(hadjustment=None, vadjustment=None)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_min_content_height(0)
+        scroll.add(outer)
+        return scroll
 
     def refresh_clients(self):
-        self.client_box.remove_all()
+        self.client_store.clear()
         r = self.cli("client", "list")
         for name in r.stdout.splitlines():
             if name.strip():
-                self.client_box.append_text(name.strip())
+                self.client_store.append([name.strip()])
 
     def _meta_args(self):
-        client = self.client_box.get_child().get_text().strip()
+        client = self.client_box.get_text().strip()
         focus = self.focus_entry.get_text().strip()
         return (["--client", client] if client else []) + (["--focus", focus] if focus else [])
 
     def on_glossary(self):
-        client = self.client_box.get_child().get_text().strip()
+        client = self.client_box.get_text().strip()
         if not client:
             self.error_dialog(T("Glossary"), T("Type the client's name first."))
             return
@@ -936,7 +958,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
             for key, val in obs_vals.items():
                 self.cli("client", "config", client, key, val)
             self.refresh_clients()
-            self.client_box.get_child().set_text(client)
+            self.client_box.set_text(client)
 
     def _set_new_mode(self, key):
         self.new_stack.set_visible_child_name(key)
@@ -1120,7 +1142,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
 
     @staticmethod
     def _split_turn(line):
-        m = re.match(r"\[(\d{2}:\d{2})\]\s+([^:]+):\s*(.*)", line.strip())
+        m = re.match(r"\[(\d{1,3}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
         return m.groups() if m else ("", "", line.strip())
 
     # ---------- first run ----------
@@ -1324,7 +1346,13 @@ class MinutaWindow(Gtk.ApplicationWindow):
         for child in self.listbox.get_children():
             self.listbox.remove(child)
         files = sorted(NOTES_DIR.glob("*.md"), reverse=True) if NOTES_DIR.exists() else []
-        if not files:
+        states = dict(mmerge.inventory(NOTES_DIR, REC_DIR))
+        # A busy recording can already have an older notes file. Keep one row and mark it busy,
+        # so selecting it cannot expose actions that race with finish/reprocess.
+        pending = [(n, st) for n, st in states.items()
+                   if st in ("transcript", "audio") or
+                   (st == "busy" and not (NOTES_DIR / f"{n}.md").exists())]
+        if not files and not pending:
             row = Gtk.ListBoxRow(selectable=False)
             lbl = Gtk.Label(label=T("No meetings yet."))
             lbl.get_style_context().add_class("empty")
@@ -1333,7 +1361,9 @@ class MinutaWindow(Gtk.ApplicationWindow):
             row.add(lbl); self.listbox.add(row); self.listbox.show_all()
             return
         for f in files:
-            self.listbox.add(self._meeting_row(f))
+            self.listbox.add(self._meeting_row(f, "busy" if states.get(f.stem) == "busy" else ""))
+        for n, st in pending:
+            self.listbox.add(self._meeting_row(NOTES_DIR / f"{n}.md", st))
         self.listbox.show_all()
         self._apply_search()
 
@@ -1399,7 +1429,7 @@ class MinutaWindow(Gtk.ApplicationWindow):
         self.client_filter.set_active_id(current if current in names else "")
         self.client_filter.set_visible(bool(names))
 
-    def _meeting_row(self, path: Path):
+    def _meeting_row(self, path: Path, pending: str = ""):
         stem = path.stem
         m = re.match(r"(\d{4}-\d{2}-\d{2})[_-](\d{2})-(\d{2})_(.*)", stem)
         if m:
@@ -1422,6 +1452,10 @@ class MinutaWindow(Gtk.ApplicationWindow):
             prov = note_provider(path.read_text(encoding="utf-8"))
         except OSError:
             prov = ""
+        if pending == "busy":
+            meta += "  ·  " + T("⏳ being processed")
+        elif pending:
+            meta += "  ·  " + T("⚠ not processed")
         if prov:
             meta += "  ·  ☁ " + PROVIDER_NAMES.get(prov, prov)
         client = next((m.client for m in self._meetings if m.name == stem), "")
@@ -1429,10 +1463,13 @@ class MinutaWindow(Gtk.ApplicationWindow):
             meta += "  ·  " + client
         row = Gtk.ListBoxRow()
         row.path = path
+        row.pending = pending
+        row.get_accessible().set_name(f"{title}, {meta}")
         outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         badge = Gtk.Box()
         badge.get_style_context().add_class("badge")
-        icon = Gtk.Image.new_from_icon_name("text-x-generic-symbolic", Gtk.IconSize.BUTTON)
+        icon = Gtk.Image.new_from_icon_name(
+            "emblem-synchronizing-symbolic" if pending == "busy" else "dialog-warning-symbolic" if pending else "text-x-generic-symbolic", Gtk.IconSize.BUTTON)
         icon.set_hexpand(True); icon.set_halign(Gtk.Align.CENTER); icon.set_valign(Gtk.Align.CENTER)
         badge.pack_start(icon, True, True, 0)
         badge.set_valign(Gtk.Align.CENTER); badge.set_halign(Gtk.Align.START); badge.set_hexpand(False)
@@ -1465,6 +1502,27 @@ class MinutaWindow(Gtk.ApplicationWindow):
             return
         self._refresh_actions()
         self._update_stage()
+        if getattr(row, "pending", "") == "busy":
+            self.selected = None                  # another job owns it: no actions until it finishes
+            self._refresh_actions()
+            self._show_provider("")
+            self.webview.load_html(f"<style>{NOTE_CSS}</style><h1>{html.escape(T('Being processed'))}</h1>"
+                                   f"<p>{html.escape(T('Another Minuta job is working on this recording. It will appear here when it is done.'))}</p>", None)
+            return
+        if getattr(row, "pending", ""):
+            note = ("This recording has a transcript but no notes yet. Use “Rewrite notes” to write them."
+                    if row.pending == "transcript" else
+                    "This recording has audio but no transcript yet. Use “Transcribe again” to process it.")
+            doc = f"<h1>{html.escape(T('Not processed yet'))}</h1><p>{html.escape(T(note))}</p>"
+            txt = REC_DIR / (row.path.stem + ".txt")
+            if row.pending == "transcript" and txt.exists():
+                try:
+                    doc += f"<h2>{T('Transcript')}</h2>" + transcript_html(txt.read_text(encoding="utf-8"))
+                except (OSError, UnicodeError) as e:
+                    doc += f"<p>{html.escape(T('Could not read transcript'))}: {html.escape(str(e))}</p>"
+            self._show_provider("")
+            self.webview.load_html(f"<style>{NOTE_CSS}</style>" + doc, None)
+            return
         try:
             md = row.path.read_text()
         except OSError as e:
@@ -1482,9 +1540,15 @@ class MinutaWindow(Gtk.ApplicationWindow):
                                                      | WebKit2.FindOptions.WRAP_AROUND, 50), False)[1])
 
     def _build_actions(self):
-        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         bar.set_margin_top(8); bar.set_margin_bottom(8)
         bar.set_margin_start(16); bar.set_margin_end(16)
+        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE,
+                           row_spacing=4, column_spacing=8, homogeneous=False,
+                           max_children_per_line=8, min_children_per_line=1)
+        flow.set_activate_on_single_click(False)
+        flow.set_halign(Gtk.Align.FILL)
+        bar.pack_start(flow, False, True, 0)
         self.action_btns = []
         spec = [
             ("Rename", None, self.on_rename),
@@ -1502,20 +1566,21 @@ class MinutaWindow(Gtk.ApplicationWindow):
             b.get_style_context().add_class("chip")
             if label == "Delete":
                 b.get_style_context().add_class("danger")
-                bar.pack_start(Gtk.Separator(orientation=Gtk.Orientation.VERTICAL), False, False, 4)
             b.connect("clicked", lambda _b, h=handler: h())
             b.set_sensitive(False)
-            bar.pack_start(b, False, False, 0)
+            flow.insert(b, -1)
             self.action_btns.append(b)
         self.provider_lbl = Gtk.Label(label="")
-        self.provider_lbl.set_halign(Gtk.Align.END); self.provider_lbl.set_hexpand(True)
-        bar.pack_start(self.provider_lbl, True, True, 0)
+        self.provider_lbl.set_halign(Gtk.Align.END)
+        bar.pack_start(self.provider_lbl, False, True, 0)
         return bar
 
     def _refresh_actions(self):
         enabled = self.selected is not None and getattr(self, "mode", "idle") == "idle"
         for b in self.action_btns:
             b.set_sensitive(enabled)
+        if hasattr(self, "join_btn"):
+            self.join_btn.set_sensitive(getattr(self, "mode", "idle") == "idle")
 
     def _run_action(self, busy_text, *args, then_select=None):
         label = f"{T(busy_text).rstrip('…')} · " + re.sub(r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}_", "", args[1] if len(args) > 1 else "")
@@ -1525,6 +1590,9 @@ class MinutaWindow(Gtk.ApplicationWindow):
         if r.returncode != 0:
             self.error_dialog(T("The action failed"), (r.stderr or r.stdout)[-800:])
         keep = then_select
+        if keep == "__joined__":
+            m = re.search(r"Joined \d+ parts into: (\S+)", r.stdout)
+            keep = m.group(1) if m else None
         if keep == "__renamed__":
             m = re.search(r"Renamed to: (\S+)", r.stdout)
             keep = m.group(1) if m else (self.selected.stem if self.selected else None)
@@ -1537,6 +1605,88 @@ class MinutaWindow(Gtk.ApplicationWindow):
                     break
         self._refresh_actions()
         return False
+
+    def _part_label(self, name, state):
+        m = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})_(.*)", name)
+        title = (m.group(4) if m else name).replace("-", " ")
+        md = NOTES_DIR / f"{name}.md"
+        try:
+            first = md.open(encoding="utf-8").readline().strip()
+            if first.startswith("# ") and len(first) > 2:
+                title = first[2:].strip()
+        except OSError:
+            pass
+        when = f"{m.group(1)} {m.group(2)}:{m.group(3)}" if m else ""
+        return f"{title} · {when}" + (f" · {T('no notes yet')}" if state == "transcript" else "")
+
+    def on_join(self):
+        """Pick existing recordings, put them in order, and create one new meeting from them."""
+        if self.mode != "idle":
+            return
+        cands = [(n, st) for n, st in mmerge.inventory(NOTES_DIR, REC_DIR)
+                 if st in ("notes", "transcript") and (REC_DIR / f"{n}.txt").is_file()
+                 and (REC_DIR / f"{n}.txt").stat().st_size > 0]
+        if len(cands) < 2:
+            self.error_dialog(T("Join failed"), T("Not enough recordings with a transcript to join."))
+            return
+        cands.sort()                      # oldest first: the usual order of the parts
+        d = Gtk.Dialog(title=T("Join parts of a meeting"), transient_for=self, modal=True)
+        d.add_button(T("Cancel"), Gtk.ResponseType.CANCEL)
+        ok = d.add_button(T("Join"), Gtk.ResponseType.OK)
+        ok.set_sensitive(False)
+        d.set_default_size(560, 460)
+        box = d.get_content_area()
+        box.set_spacing(8)
+        box.set_margin_top(12); box.set_margin_start(16); box.set_margin_end(16); box.set_margin_bottom(8)
+        for key in ("Tick the recordings that are parts of the same meeting and put them in the order they happened. A new meeting is created; the originals are kept as they are.",
+                    "Speaker names stay separate per part (Speaker 1 (part 2)). Use Speakers afterwards to say two are the same person."):
+            lbl = Gtk.Label(label=T(key), xalign=0, wrap=True)
+            box.pack_start(lbl, False, False, 0)
+        lb = Gtk.ListBox(selection_mode=Gtk.SelectionMode.NONE)
+        checks = []
+
+        def refresh(*_):
+            n = sum(1 for c in checks if c.get_active())
+            ok.set_sensitive(n >= 2 and bool(title.get_text().strip()))
+
+        def move(row, delta, btn):
+            idx = min(max(row.get_index() + delta, 0), len(checks) - 1)
+            lb.remove(row); lb.insert(row, idx)
+            btn.grab_focus()
+
+        for n, st in cands:
+            label = self._part_label(n, st)
+            row = Gtk.ListBoxRow()
+            row.part = n
+            h = Gtk.Box(spacing=6)
+            chk = Gtk.CheckButton(label=label)
+            chk.get_accessible().set_name(T("Include {name}", name=label))
+            chk.connect("toggled", refresh)
+            checks.append(chk); row.chk = chk
+            h.pack_start(chk, True, True, 0)
+            for icon, key, delta in (("go-up-symbolic", "Move {name} up", -1), ("go-down-symbolic", "Move {name} down", 1)):
+                b = Gtk.Button.new_from_icon_name(icon, Gtk.IconSize.BUTTON)
+                b.set_tooltip_text(T("Move up" if delta < 0 else "Move down"))
+                b.get_accessible().set_name(T(key, name=label))
+                b.connect("clicked", lambda btn, r=row, dl=delta: move(r, dl, btn))
+                h.pack_start(b, False, False, 0)
+            row.add(h)
+            lb.add(row)
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER)
+        sw.set_vexpand(True); sw.add(lb)
+        box.pack_start(sw, True, True, 0)
+        title = Gtk.Entry(placeholder_text=T("Title of the joined meeting"), activates_default=False)
+        title.get_accessible().set_name(T("Title of the joined meeting"))
+        title.connect("changed", refresh)
+        box.pack_start(title, False, False, 0)
+        d.show_all()
+        resp = d.run()
+        names = [r.part for r in lb.get_children() if r.chk.get_active()]
+        name = title.get_text().strip()
+        d.destroy()
+        if resp == Gtk.ResponseType.OK and len(names) >= 2 and name:
+            self.submit_job(T("Joining parts…"), ("merge", "--title", name, *names),
+                            lambda r: self._action_done(r, "__joined__"))
 
     def on_rename(self):
         if not self.selected:

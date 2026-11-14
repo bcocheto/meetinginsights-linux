@@ -13,14 +13,23 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import merge  # noqa: E402  (part-boundary lines of joined meetings)
+
 ACCENT = "3584E4"
 ACCENT_RGB = (0x35, 0x84, 0xE4)
 SPEAKER_COLORS = ["3584E4", "26A269", "E5A50A", "C061CB", "E66100", "1C71D8"]
 
 LABELS = {
-    "pt": {"transcript": "Transcrição", "exported": "Exportado pelo Minuta"},
-    "en": {"transcript": "Transcript", "exported": "Exported by Minuta"},
+    "pt": {"transcript": "Transcrição", "exported": "Exportado pelo Minuta", "part": "Parte", "starts": "começa em"},
+    "en": {"transcript": "Transcript", "exported": "Exported by Minuta", "part": "Part", "starts": "starts at"},
 }
+
+
+def part_title(part, lang) -> str:
+    i, name, start, approx = part
+    L = LABELS[lang]
+    return f"{L['part']} {i}: {name} ({L['starts']} {'~' if approx else ''}{start})"
 
 
 # ---------------------------------------------------------------- parsing
@@ -66,11 +75,18 @@ def parse_notes(md: str) -> list[tuple]:
 
 
 def parse_transcript(text: str) -> list[dict]:
-    turns = []
+    """Turns; the first turn of each joined part also carries 'part': where that recording starts."""
+    turns, pending = [], None
     for line in text.splitlines():
-        m = re.match(r"\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
+        h = merge.parse_header(line)
+        if h:
+            pending = (h[0], h[1], h[2], h[3])
+            continue
+        m = re.match(r"\[(\d{1,3}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
         if m:
             turns.append({"t": m.group(1), "speaker": m.group(2).strip(), "text": m.group(3).strip()})
+            if pending:
+                turns[-1]["part"] = pending; pending = None
     return turns
 
 
@@ -78,7 +94,7 @@ def group_turns(turns: list[dict]) -> list[dict]:
     """Merge consecutive lines from the same speaker into one paragraph."""
     out = []
     for t in turns:
-        if out and out[-1]["speaker"] == t["speaker"]:
+        if out and out[-1]["speaker"] == t["speaker"] and not t.get("part"):
             out[-1]["text"] += " " + t["text"]
         else:
             out.append(dict(t))
@@ -131,6 +147,8 @@ def to_markdown(blocks, turns, lang, with_transcript) -> str:
     if with_transcript and turns:
         L.append(f"## {LABELS[lang]['transcript']}\n")
         for t in group_turns(turns):
+            if t.get("part"):
+                L.append(f"### {part_title(t['part'], lang)}\n")
             L.append(f"**{t['speaker']}** · `{t['t']}`  \n{t['text']}\n")
     return "\n".join(L).rstrip() + "\n"
 
@@ -193,6 +211,9 @@ def to_docx(blocks, turns, lang, with_transcript, out: Path) -> None:
         runs(p, LABELS[lang]["transcript"].upper(), size=10, color=ACCENT, bold_all=True)
         colors = speaker_colors(turns)
         for t in group_turns(turns):
+            if t.get("part"):
+                p = doc.add_paragraph(); p.paragraph_format.space_before = Pt(10)
+                runs(p, part_title(t["part"], lang), size=10, color="555555", bold_all=True)
             p = doc.add_paragraph(); p.paragraph_format.space_after = Pt(2)
             r = p.add_run(t["speaker"]); r.bold = True; r.font.color.rgb = RGBColor.from_string(colors[t["speaker"]])
             r = p.add_run(f"   {t['t']}"); r.font.size = Pt(8.5); r.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
@@ -228,6 +249,8 @@ def to_pdf(blocks, turns, lang, with_transcript, out: Path) -> None:
     s_cell_h = ParagraphStyle("ch", parent=s_cell, fontName="Helvetica-Bold", textColor=colors.white)
     s_speaker = ParagraphStyle("sp", parent=base, fontName="Helvetica-Bold", fontSize=10, spaceBefore=8, spaceAfter=1)
     s_text = ParagraphStyle("tx", parent=base, leftIndent=10, spaceAfter=4)
+    s_part = ParagraphStyle("pt", parent=base, fontName="Helvetica-Bold", fontSize=9.5, textColor=grey,
+                            spaceBefore=12, spaceAfter=2)
 
     def rich(text):
         out_ = []
@@ -270,6 +293,8 @@ def to_pdf(blocks, turns, lang, with_transcript, out: Path) -> None:
         story.append(Paragraph(escape(LABELS[lang]["transcript"].upper()), s_h2))
         cmap = speaker_colors(turns)
         for t in group_turns(turns):
+            if t.get("part"):
+                story.append(Paragraph(escape(part_title(t["part"], lang)), s_part))
             hexc = cmap[t["speaker"]]
             head = (f'<font color="#{hexc}">{escape(t["speaker"])}</font>'
                     f'  <font size="8" color="#888888">{escape(t["t"])}</font>')

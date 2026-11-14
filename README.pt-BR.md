@@ -15,7 +15,7 @@
 
 [Recursos](#recursos) · [Como funciona](#como-funciona) · [Instalação](#instalação) · [Uso](#uso) · [Configurar o Obsidian](#configurar-o-obsidian) · [Configurações](#configurações) · [Privacidade](#privacidade)
 
-🌐 **Português (Brasil)** · [English](README.md)
+🌐 **Português (Brasil)** · [English](README.en.md)
 
 <br>
 
@@ -195,6 +195,8 @@ minuta toggle                                # inicia, ou para e escreve a ata (
 minuta shortcut set "<Super><Alt>r"          # vira um atalho de teclado do GNOME (também em Configurações)
 minuta speakers <nome>                       # lista os falantes
 minuta speakers <nome> "Speaker 2=Maria"     # renomeia na transcrição e na ata
+minuta parts                                 # todas as gravações e o que ainda falta (ata / transcrição / áudio)
+minuta merge --title "Planejamento" <parte1> <parte2>   # junta gravações de uma reunião em uma reunião NOVA
 minuta export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
 minuta delete <nome>
 minuta obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian
@@ -202,6 +204,13 @@ minuta trello send <nome> [--only 1,3] [--dry-run]       # itens de ação viram
 minuta search [--client N] palavras  # encontra reuniões pelo que foi dito
 minuta recover [--list]           # conclui uma gravação interrompida
 ```
+
+`minuta merge` só lê as partes que você lista, na ordem em que você as dá: os originais nunca são
+alterados nem apagados, e um nome que já existe nunca é sobrescrito. A linha do tempo continua
+entre as partes e cada rótulo de falante leva a sua parte ("Falante 1 (parte 2)"), porque as vozes
+são numeradas por gravação; diga que dois são a mesma pessoa com `minuta speakers <nome> "Antigo=Novo"`.
+No app: **Juntar partes…** na barra lateral. Gravações que têm transcrição ou áudio, mas não têm
+ata, aparecem na lista como "não processada", para nenhuma ficar fora de vista.
 
 `<nome>` é o nome do arquivo sem a extensão, por exemplo `2026-11-09_14-36_alinhamento-semanal`.
 Rode `minuta help` para ver a lista completa. O comando

@@ -60,6 +60,18 @@ class Cli(unittest.TestCase):
         self.assertFalse((rec / f"{name}.meta").exists())
         self.assertEqual(self.run_cli("delete", "2026-11-10_11-00_depois").returncode, 0)
         self.assertFalse((rec / "2026-11-10_11-00_depois.meta").exists())
+        self.assertTrue((rec / "2026-11-10_11-00_depois.lock").exists())  # keep the inode stable for future locks
+
+    def test_rename_refuses_a_transcript_only_destination_without_overwriting_it(self):
+        rec = self.home / "rec"
+        source = "2026-11-10_11-00_source"
+        target = "2026-11-10_11-00_target"
+        (rec / f"{source}.txt").write_text("source transcript\n")
+        (rec / f"{target}.txt").write_text("target transcript\n")
+        r = self.run_cli("rename", source, "target")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual((rec / f"{source}.txt").read_text(), "source transcript\n")
+        self.assertEqual((rec / f"{target}.txt").read_text(), "target transcript\n")
 
     def test_speakers_list_and_rename(self):
         name = "2026-11-10_11-00_ata"

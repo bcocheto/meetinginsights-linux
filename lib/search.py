@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 STEM_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})_(.*)$")
-TURN_RE = re.compile(r"^\[(\d{2}:\d{2})\]\s+([^:]+):\s*(.*)$")
+TURN_RE = re.compile(r"^\[(\d{1,3}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)$")
 
 
 def fold(text: str) -> str:

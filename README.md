@@ -4,63 +4,65 @@
 
 # Minuta
 
-**Record a meeting. Get the transcript and the minutes. Nothing leaves your computer.**
+**Grave uma reunião. Receba a transcrição e a ata. Nada sai do seu computador.**
 
-<sub>Formerly *MeetingInsights* — [what changed](#upgrading-from-meetinginsights)</sub>
+<sub>Antes chamada de *MeetingInsights*: [o que mudou](#atualizando-do-meetinginsights)</sub>
 
-[![Licence: MIT](https://img.shields.io/badge/licence-MIT-004c99)](LICENSE)
-[![Platform: Linux](https://img.shields.io/badge/platform-Linux-004c99)](#install)
-[![Runs offline](https://img.shields.io/badge/runs-offline-1f8a4c)](#privacy)
-[![GPU optional](https://img.shields.io/badge/GPU-optional-d9731a)](#requirements)
+[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-004c99)](LICENSE)
+[![Plataforma: Linux](https://img.shields.io/badge/plataforma-Linux-004c99)](#instalação)
+[![Funciona offline](https://img.shields.io/badge/funciona-offline-1f8a4c)](#privacidade)
+[![GPU opcional](https://img.shields.io/badge/GPU-opcional-d9731a)](#requisitos)
 
-[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Use](#use) · [Obsidian](#obsidian) · [Settings](#settings) · [Privacy](#privacy)
+[Recursos](#recursos) · [Como funciona](#como-funciona) · [Instalação](#instalação) · [Uso](#uso) · [Configurar o Obsidian](#configurar-o-obsidian) · [Configurações](#configurações) · [Privacidade](#privacidade)
 
-🌐 **English** · [Português (Brasil)](README.pt-BR.md)
+🌐 **Português (Brasil)** · [English](README.en.md)
 
 <br>
 
-<img src="docs/screenshots/notes.png" alt="Meeting notes in Minuta: summary, what matters, action items" width="860">
+<img src="docs/screenshots/notes.png" alt="Ata de uma reunião no Minuta: resumo, o que importa e itens de ação" width="860">
+
+<sub>As capturas de tela mostram a interface em inglês, com dados fictícios. O app segue o idioma do seu sistema.</sub>
 
 </div>
 
 <br>
 
-A Linux desktop app (GTK) and a command-line tool that turn a call into a transcript and
-structured notes — a summary, **action items with owners**, decisions and open questions —
-in the language of the meeting. Speech recognition and note writing run on your machine:
-no account, no API key, no upload. Writing the notes with Claude Code or Gemini CLI is
-possible, but it is off unless you turn it on.
+Um aplicativo de desktop para Linux (GTK) e uma ferramenta de linha de comando que
+transformam uma chamada em transcrição e ata estruturada: resumo, **itens de ação com
+responsável**, decisões e perguntas em aberto, no idioma da reunião. O reconhecimento de fala
+e a escrita da ata rodam na sua máquina: sem conta, sem chave de API, sem envio de dados.
+Escrever a ata com o Claude Code ou o Gemini CLI é possível, mas fica desligado até você ligar.
 
-## Features
+## Recursos
 
 |  |  |
 |---|---|
-| 🎙️ **Record or import** | Capture the microphone and the call audio together, or drop in any audio or video file. |
-| ⚡ **Live transcription** | The transcript is built while the meeting runs, so stopping is nearly instant. |
-| 🗂️ **Background queue** | Notes are written in the background: the window is free right after **Stop**, and you can start the next recording while the last one is still being processed. |
-| 👥 **Who said what** | *You*, and each voice on the far end (*Participant 1, 2…*). |
-| 📝 **Useful notes** | Summary with an overview, action items with owners, decisions, open questions. Portuguese and English. |
-| 🎯 **Client and focus** | A saved **glossary** of names and terms per client, and a **focus** ("what matters in this meeting") that gets its own *In focus* section. |
-| 🔊 **Input meters** | Live levels for the microphone and the call audio, with a warning when one of them goes quiet — a dead input is caught in seconds, not after the meeting. |
-| 🟣 **Obsidian export** | Save a meeting as a note in your vault: frontmatter, a foldable transcript, a link back to the client's hub and a line in its index, so the note is reachable from the rest of the vault. |
-| 🗒️ **Action items to Trello** | Turn a meeting's action items into Trello cards (owner, meeting and time in the description) with one click. Opt-in: nothing is sent until you choose items. |
-| 🔎 **Search everything** | Find a meeting by what was said — in the notes *and* the transcript, ignoring case and accents — and filter by client. Matches are highlighted in the notes. |
-| 🛟 **Crash recovery** | A recording cut short (crash, power loss) is finished on the next launch, and audio that never got notes is offered for processing. |
-| 📤 **Export and edit** | Rename, rewrite the notes, transcribe again, edit the transcript, delete; export to Markdown, Word (`.docx`) or PDF. |
-| 🧠 **Your choice of writer** | A small local model, a bigger local one, or — opt in — Claude Code / Gemini CLI. |
+| 🎙️ **Gravar ou importar** | Capture o microfone e o áudio da chamada juntos, ou importe qualquer arquivo de áudio ou vídeo. |
+| ⚡ **Transcrição ao vivo** | A transcrição é feita enquanto a reunião acontece, então parar a gravação é quase instantâneo. |
+| 🗂️ **Fila em segundo plano** | A ata é escrita em segundo plano: a janela fica livre logo depois do **Parar**, e dá para começar a próxima gravação enquanto a anterior ainda é processada. |
+| 👥 **Quem disse o quê** | *Você* e cada voz do outro lado (*Participante 1, 2…*). |
+| 📝 **Atas úteis** | Resumo com uma visão geral, itens de ação com responsável, decisões e perguntas em aberto. Português e inglês. |
+| 🎯 **Cliente e foco** | Um **glossário** salvo de nomes e termos por cliente, e um **foco** ("o que importa nesta reunião") que ganha uma seção própria, *Em foco*. |
+| 🔊 **Medidores de áudio** | Níveis ao vivo do microfone e do áudio da chamada, com aviso quando um deles fica em silêncio: uma entrada morta é percebida em segundos, não depois da reunião. |
+| 🟣 **Exportação para o Obsidian** | Salve uma reunião como nota no seu vault: frontmatter, transcrição dobrável, link para o hub do cliente e uma linha no índice, para a nota ser alcançável a partir do resto do vault. |
+| 🗒️ **Itens de ação para o Trello** | Transforme os itens de ação de uma reunião em cartões do Trello (responsável, reunião e hora na descrição) com um clique. Opcional: nada é enviado até você escolher os itens. |
+| 🔎 **Busca em tudo** | Encontre uma reunião pelo que foi dito, nas notas *e* na transcrição, ignorando maiúsculas e acentos, e filtre por cliente. O trecho encontrado fica destacado na ata. |
+| 🛟 **Recuperação de falhas** | Uma gravação interrompida (travamento, queda de energia) é concluída na próxima abertura, e áudios que ficaram sem ata são oferecidos para processamento. |
+| 📤 **Exportar e editar** | Renomear, reescrever a ata, transcrever de novo, editar a transcrição, excluir; exportar para Markdown, Word (`.docx`) ou PDF. |
+| 🧠 **Você escolhe quem escreve** | Um modelo local pequeno, um local maior ou, se você optar, o Claude Code / Gemini CLI. |
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/new-meeting.png" alt="New meeting: title, client, focus"><br><sub><b>New meeting</b> — a title, an optional client (with its glossary) and a focus.</sub></td>
-<td width="50%"><img src="docs/screenshots/recording.png" alt="Recording with input meters and live transcript"><br><sub><b>Recording</b> — input meters and a live transcript.</sub></td>
+<td width="50%"><img src="docs/screenshots/new-meeting.png" alt="Nova reunião: título, cliente, foco"><br><sub><b>Nova reunião</b>: um título, um cliente opcional (com o glossário dele) e um foco.</sub></td>
+<td width="50%"><img src="docs/screenshots/recording.png" alt="Gravando, com medidores de áudio e transcrição ao vivo"><br><sub><b>Gravando</b>: medidores de áudio e transcrição ao vivo.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/search.png" alt="Searching every meeting"><br><sub><b>Search</b> — across notes and transcripts, with a client filter.</sub></td>
-<td width="50%"><img src="docs/screenshots/queue.png" alt="Notes view with the processing queue in the sidebar"><br><sub><b>Background queue</b> — the next recording can start while this one is processed.</sub></td>
+<td width="50%"><img src="docs/screenshots/search.png" alt="Busca em todas as reuniões"><br><sub><b>Busca</b>: nas notas e nas transcrições, com filtro de cliente.</sub></td>
+<td width="50%"><img src="docs/screenshots/queue.png" alt="Ata aberta, com a fila de processamento na lateral"><br><sub><b>Fila em segundo plano</b>: a próxima gravação pode começar enquanto esta é processada.</sub></td>
 </tr>
 </table>
 
-## How it works
+## Como funciona
 
 ```mermaid
 flowchart LR
@@ -69,72 +71,73 @@ flowchart LR
     classDef back fill:#004c99,stroke:#00366b,color:#fff,stroke-width:2.5px
     classDef data fill:#3a7ca5,stroke:#004c99,color:#fff,stroke-width:2.5px
 
-    U([You and the call]):::user --> A[GTK app / CLI]:::front
-    A --> C[Capture<br/>mic left, call right]:::back
-    C --> W[Live transcription<br/>faster-whisper]:::back
-    W --> D[Voices on the far end<br/>sherpa-onnx]:::back
-    D --> R[Rules: actions,<br/>decisions, questions]:::back
-    R --> L[Summary writer<br/>local model or opt-in CLI]:::back
-    C -.-> S[(Audio and<br/>transcripts)]:::data
-    L --> N[(Notes<br/>Markdown)]:::data
+    U([Você e a chamada]):::user --> A[App GTK / CLI]:::front
+    A --> C[Captura<br/>mic à esquerda, chamada à direita]:::back
+    C --> W[Transcrição ao vivo<br/>faster-whisper]:::back
+    W --> D[Vozes do outro lado<br/>sherpa-onnx]:::back
+    D --> R[Regras: ações,<br/>decisões, perguntas]:::back
+    R --> L[Redator do resumo<br/>modelo local ou CLI opcional]:::back
+    C -.-> S[(Áudio e<br/>transcrições)]:::data
+    L --> N[(Atas<br/>Markdown)]:::data
     N --> A
     linkStyle default stroke:#004c99,stroke-width:2.5px
 ```
 
-| Part of the notes | Produced by |
+| Parte da ata | Produzida por |
 |---|---|
-| Transcript | faster-whisper, local, on the GPU when there is one |
-| "You" vs. the far end | audio routing (separate channels) |
-| *Participant 1, 2…* on the far end | offline speaker diarization (sherpa-onnx) |
-| Questions, decisions, action items | pattern rules over the transcript (Portuguese and English) |
-| Action-item owners | the speaker labels |
-| **In focus** section | keyword match of your focus against the transcript |
-| Prose summary | a local language model (small or medium), or Claude Code / Gemini CLI if you opt in |
+| Transcrição | faster-whisper, local, na GPU quando houver |
+| "Você" x o outro lado | roteamento do áudio (canais separados) |
+| *Participante 1, 2…* do outro lado | diarização de voz offline (sherpa-onnx) |
+| Perguntas, decisões, itens de ação | regras de padrões sobre a transcrição (português e inglês) |
+| Responsáveis pelos itens de ação | os rótulos de quem falou |
+| Seção **Em foco** | busca por palavras-chave do seu foco na transcrição |
+| Resumo em texto | um modelo de linguagem local (pequeno ou médio), ou Claude Code / Gemini CLI se você optar |
 
-**Why the speakers are reliable.** Your microphone is recorded to the left channel and
-everything you hear to the right, and each channel is transcribed separately, so "You" is
-exact. The far end shares one channel; a diarization model splits it by voice, cutting
-where the voice changes. Action-item owners are read off those labels. The language model
-is never asked who committed to what, so it cannot invent a participant.
+**Por que a identificação de quem falou é confiável.** O seu microfone é gravado no canal
+esquerdo e tudo que você ouve no direito, e cada canal é transcrito separadamente, então
+"Você" é exato. O outro lado compartilha um único canal; um modelo de diarização o separa por
+voz, cortando no momento em que a voz muda. Os responsáveis pelos itens de ação são lidos
+desses rótulos. O modelo de linguagem nunca é perguntado sobre quem se comprometeu com o quê,
+então ele não consegue inventar um participante.
 
-**Why a tiny model can be enough.** Structure, classification and attribution are done in
-code, and the model only writes the prose. In testing, moving classification out of the
-model and into rules fixed every misclassification and cut runtime by ~75%. For richer
-summaries choose the **medium** local model (3B): it also writes a short overview at the
-top and writes in the language of the meeting, at about 4× the time on a CPU (roughly
-5 minutes for an 11-minute meeting on 8 cores). Like any small model it can still get a
-detail wrong, so read the notes before you share them.
+**Por que um modelo pequeno pode bastar.** Estrutura, classificação e atribuição são feitas
+em código, e o modelo só escreve o texto corrido. Nos testes, tirar a classificação do modelo
+e passá-la para regras eliminou todos os erros de classificação e reduziu o tempo em ~75%.
+Para resumos mais ricos, escolha o modelo local **médio** (3B): ele também escreve uma breve
+visão geral no topo e escreve no idioma da reunião, em cerca de 4 vezes o tempo numa CPU
+(aproximadamente 5 minutos para uma reunião de 11 minutos, em 8 núcleos). Como todo modelo
+pequeno, ele ainda pode errar um detalhe: leia a ata antes de compartilhar.
 
-## Requirements
+## Requisitos
 
-- Linux with PulseAudio or PipeWire, `ffmpeg`, Python 3.9+
-- A GPU is optional. Without one it runs on the CPU with the `small` model; with an NVIDIA
-  GPU the installer adds the CUDA libraries and uses `large-v3-turbo`, which is several
-  times faster (a 62-second recording takes about 4 s after the model loads).
-- Disk: ~1.5 GB for the base models, plus ~1.6 GB for `large-v3-turbo`, ~2 GB for the
-  medium summary model and ~46 MB for the diarization model — each downloaded once, only
-  if you use it. About 650 MB of RAM while writing notes with the small model, about 3 GB
-  with the medium one.
+- Linux com PulseAudio ou PipeWire, `ffmpeg`, Python 3.9+
+- A GPU é opcional. Sem ela, roda na CPU com o modelo `small`; com uma GPU NVIDIA, o
+  instalador adiciona as bibliotecas CUDA e usa o `large-v3-turbo`, que é várias vezes mais
+  rápido (uma gravação de 62 segundos leva cerca de 4 s depois que o modelo carrega).
+- Disco: ~1,5 GB para os modelos básicos, mais ~1,6 GB para o `large-v3-turbo`, ~2 GB para o
+  modelo de resumo médio e ~46 MB para o modelo de diarização, cada um baixado uma vez e só
+  se você usar. Cerca de 650 MB de RAM ao escrever a ata com o modelo pequeno e cerca de 3 GB
+  com o médio.
 
-## Install
+## Instalação
 
-**Debian / Ubuntu** — download the `.deb` from the [latest release](https://github.com/bcocheto/minuta/releases/latest). The package bundles the llama.cpp runtime, so nothing has to be compiled:
+**Debian / Ubuntu**: baixe o `.deb` da [última release](https://github.com/bcocheto/minuta/releases/latest). O pacote já traz o llama.cpp, então não é preciso compilar nada:
 
 ```sh
-sudo apt install ./minuta_<version>_amd64.deb
-minuta setup      # prepares Python and downloads the models, once
+sudo apt install ./minuta_<versão>_amd64.deb
+minuta setup      # prepara o Python e baixa os modelos, uma vez
 ```
 
-**From source** (any distro):
+**A partir do código-fonte** (qualquer distribuição):
 
 ```sh
 git clone https://github.com/bcocheto/minuta && cd minuta
-./install.sh               # installs to ~/.local
+./install.sh               # instala em ~/.local
 minuta setup
 ```
 
 <details>
-<summary>The source install needs llama.cpp, built once</summary>
+<summary>A instalação pelo código-fonte precisa do llama.cpp, compilado uma vez</summary>
 
 ```sh
 git clone --depth 1 https://github.com/ggml-org/llama.cpp
@@ -144,223 +147,321 @@ mkdir -p ~/.local/share/minuta/llama
 cp build/bin/llama build/bin/*.so* ~/.local/share/minuta/llama/
 ```
 
-Upstream's prebuilt binaries require glibc 2.34, which rules out Ubuntu 20.04 and 22.04 —
-which is why the `.deb` ships its own build.
+Os binários prontos do projeto original exigem a glibc 2.34, o que exclui o Ubuntu 20.04 e o
+22.04. Por isso o `.deb` traz a própria compilação.
 </details>
 
-### Flatpak (work in progress)
+### Flatpak (em andamento)
 
-`packaging/flatpak/` has the manifest and the AppStream file for Flathub. Build and try it locally with:
+Em `packaging/flatpak/` estão o manifesto e o arquivo AppStream para o Flathub. Para compilar e testar localmente:
 
 ```sh
 flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse build-flatpak packaging/flatpak/io.github.bcocheto.Minuta.yml
 flatpak run io.github.bcocheto.Minuta
 ```
 
-The Flatpak transcribes on the CPU (no NVIDIA libraries), keeps the notes in `Documents/Minuta`, and cannot use the `claude` or `gemini` command of your system.
+O Flatpak transcreve na CPU (sem as bibliotecas da NVIDIA), guarda as atas em `Documentos/Minuta` e não consegue usar o comando `claude` ou `gemini` do seu sistema.
 
-### Upgrading from MeetingInsights
+### Atualizando do MeetingInsights
 
-Minuta is the new name of MeetingInsights, with a new icon. Nothing is lost when you upgrade:
+A Minuta é o novo nome do MeetingInsights, com um ícone novo. Nada se perde na atualização:
 
-- **Package:** `sudo apt install ./minuta_<version>_amd64.deb` replaces the old `meetinginsights` package.
-  **From source:** run `./install.sh` again; it removes the old program files and **keeps your data**.
-- **Your data moves, once:** `~/.local/share/meetinginsights` → `~/.local/share/minuta` (models, Python
-  environment, recordings) and `~/.config/meetinginsights` → `~/.config/minuta` (settings, clients). Your notes in
-  `~/MeetingNotes` stay where they are.
-- **Names:** the commands are now `minuta` and `minuta-gui`, and the variables `MINUTA_*` (the old
-  `MEETINGINSIGHTS_*` still work). The application id is `io.github.bcocheto.Minuta`.
+- **Pacote:** `sudo apt install ./minuta_<versão>_amd64.deb` substitui o pacote antigo `meetinginsights`.
+  **Pelo código-fonte:** rode o `./install.sh` de novo; ele remove os arquivos antigos do programa e **mantém os seus dados**.
+- **Os dados são movidos, uma vez:** `~/.local/share/meetinginsights` → `~/.local/share/minuta` (modelos,
+  ambiente Python, gravações) e `~/.config/meetinginsights` → `~/.config/minuta` (configurações, clientes). As suas atas em
+  `~/MeetingNotes` ficam onde estão.
+- **Nomes:** os comandos agora são `minuta` e `minuta-gui`, e as variáveis, `MINUTA_*` (as antigas
+  `MEETINGINSIGHTS_*` continuam valendo). O identificador do app é `io.github.bcocheto.Minuta`.
 
-## Use
+## Uso
 
-Open **Minuta** from the applications menu. In *New meeting* choose **Record**
-(type a title, optionally a client and a focus) or **Import a file**. When you stop, the
-notes appear in the list.
+Abra o **Minuta** no menu de aplicativos. Em *Nova reunião*, escolha **Gravar**
+(digite um título e, se quiser, um cliente e um foco) ou **Importar um arquivo**. Quando você
+parar, a ata aparece na lista.
 
-From the terminal:
+No terminal:
 
 ```sh
-minuta start "Weekly sync" --client "Acme" --focus "pricing: 8% or 10% down payment?"
-minuta stop                       # transcribes, then writes the notes
+minuta start "Alinhamento semanal" --client "Acme" --focus "preço: entrada de 8% ou 10%?"
+minuta stop                       # transcreve e depois escreve a ata
 minuta status
 
-minuta import call.mp4 "Kickoff" --client "Acme"
-minuta notes <transcript.txt>     # regenerate notes from a transcript
-minuta reprocess <name> [--notes-only] [--client N] [--focus T]
-minuta rename <name> "New title"
-minuta toggle                                # start, or stop and write the notes (one key for both)
-minuta shortcut set "<Super><Alt>r"          # make that a GNOME keyboard shortcut (also in Settings)
-minuta speakers <name>                       # list the speakers
-minuta speakers <name> "Speaker 2=Maria"     # rename them in the transcript and the notes
-minuta export <name> <md|docx|pdf> [file] [--no-transcript]
-minuta delete <name>
-minuta obsidian <name> [--folder P] [--no-transcript]   # note in your Obsidian vault
-minuta trello send <name> [--only 1,3] [--dry-run]       # action items to Trello cards
-minuta search [--client N] words  # find meetings by what was said
-minuta recover [--list]           # finish an interrupted recording
+minuta import ligacao.mp4 "Kickoff" --client "Acme"
+minuta notes <transcricao.txt>    # gera a ata de novo a partir de uma transcrição
+minuta reprocess <nome> [--notes-only] [--client N] [--focus T]
+minuta rename <nome> "Novo título"
+minuta toggle                                # inicia, ou para e escreve a ata (uma tecla para os dois)
+minuta shortcut set "<Super><Alt>r"          # vira um atalho de teclado do GNOME (também em Configurações)
+minuta speakers <nome>                       # lista os falantes
+minuta speakers <nome> "Speaker 2=Maria"     # renomeia na transcrição e na ata
+minuta parts                                 # todas as gravações e o que ainda falta (ata / transcrição / áudio)
+minuta merge --title "Planejamento" <parte1> <parte2>   # junta gravações de uma reunião em uma reunião NOVA
+minuta export <nome> <md|docx|pdf> [arquivo] [--no-transcript]
+minuta delete <nome>
+minuta obsidian <nome> [--folder P] [--no-transcript]   # nota no seu vault do Obsidian
+minuta trello send <nome> [--only 1,3] [--dry-run]       # itens de ação viram cartões do Trello
+minuta search [--client N] palavras  # encontra reuniões pelo que foi dito
+minuta recover [--list]           # conclui uma gravação interrompida
 ```
 
-`<name>` is the file stem, e.g. `2026-11-09_14-36_weekly-sync`. Run `minuta help`
-for the full list. `minuta stop --capture-only` saves the audio in a couple of
-seconds and leaves the rest to `minuta finish <name>`; the app uses this to keep
-the window free.
+`minuta merge` só lê as partes que você lista, na ordem em que você as dá: os originais nunca são
+alterados nem apagados, e um nome que já existe nunca é sobrescrito. A linha do tempo continua
+entre as partes e cada rótulo de falante leva a sua parte ("Falante 1 (parte 2)"), porque as vozes
+são numeradas por gravação; diga que dois são a mesma pessoa com `minuta speakers <nome> "Antigo=Novo"`.
+No app: **Juntar partes…** na barra lateral. Gravações que têm transcrição ou áudio, mas não têm
+ata, aparecem na lista como "não processada", para nenhuma ficar fora de vista.
 
-Notes land in `~/MeetingNotes/`; audio and transcripts in
+`<nome>` é o nome do arquivo sem a extensão, por exemplo `2026-11-09_14-36_alinhamento-semanal`.
+Rode `minuta help` para ver a lista completa. O comando
+`minuta stop --capture-only` salva o áudio em alguns segundos e deixa o resto para
+`minuta finish <nome>`; o app usa isso para manter a janela livre.
+
+As atas ficam em `~/MeetingNotes/`; o áudio e as transcrições, em
 `~/.local/share/minuta/rec/`.
 
-### Clients and glossaries
+### Clientes e glossários
 
-A glossary is the names and terms a client uses (people, products, jargon). It is added to
-the speech recognizer's prompt and given to the note writer, which fixes near-miss
-spellings. In the app, type the client in *New meeting* and press **Glossary**; from the
-CLI:
+O glossário é o conjunto de nomes e termos que um cliente usa (pessoas, produtos, jargão). Ele
+é incluído no prompt do reconhecedor de fala e entregue ao redator da ata, que corrige grafias
+aproximadas. No app, digite o cliente em *Nova reunião* e clique em **Glossário**; pela linha
+de comando:
 
 ```sh
-minuta client set "Acme" "Be In Rio, Lumière, own use, IA Zap"
+minuta client set "Acme" "Be In Rio, Lumière, uso próprio, IA Zap"
 minuta client list | show "Acme" | rm "Acme"
 ```
 
-The *focus* is free text for one meeting. It steers the summary and fills the **In focus**
-section with the lines of the transcript that mention it. It is not an instruction to the
-transcriber; use the glossary or the *Initial prompt* setting for that.
+O *foco* é um texto livre para uma reunião. Ele orienta o resumo e preenche a seção **Em foco**
+com as falas da transcrição que o mencionam. Não é uma instrução para o transcritor: para isso,
+use o glossário ou a configuração *Prompt inicial*.
 
-### Obsidian
+## Configurar o Obsidian
 
-> Passo a passo em português: [README.pt-BR.md → Configurar o Obsidian](README.pt-BR.md#configurar-o-obsidian).
+O Minuta salva uma reunião como uma nota Markdown dentro do seu vault. O vault é só
+uma pasta de arquivos, então o app apenas escreve arquivos, e **nunca fora do vault**.
 
-Point the app at your vault once, then export any meeting from **Export → Obsidian note** (the
-app asks for the vault the first time) or with `minuta obsidian <name>`:
+### Passo a passo
+
+**1. Escolha o vault (uma vez).** Pelo app, abra uma reunião e use **Exportar → Nota no
+Obsidian**: na primeira vez, ele pergunta qual é a pasta do vault. Ou pelo terminal:
 
 ```sh
-minuta config obsidian_vault ~/Documents/MyVault
-minuta config obsidian_folder "Clients/{client}/Meetings"   # default: Meetings
+minuta config obsidian_vault ~/Documentos/MeuVault
 ```
 
-The note is named `YYYY-MM-DD - Title.md`, with frontmatter (`type`, `created`, `updated`,
-the date, client, participants, duration, `tags`, the source and the meeting id), the notes as
-written, and the transcript in a foldable `[!note]-` callout (`--no-transcript` leaves it out).
-Frontmatter keys follow the interface language (Portuguese or English). Exporting again updates
-the same file; a note of yours that happens to have the same name is never overwritten, and
-nothing is ever written outside the vault.
+O caminho precisa ser uma pasta que já exista. Para trocar de vault depois, use **Exportar →
+Escolher o vault do Obsidian…** ou rode o comando acima de novo.
 
-For each client you can also say where its meetings live and how to reach them:
+**2. Defina a pasta das notas.** Por padrão, as notas vão para a pasta `Meetings` do vault.
+Você pode usar `{client}` para separar por cliente:
 
 ```sh
-minuta client config "Acme" folder "Clients/Acme/Meetings"
-minuta client config "Acme" hub    "Clients/Acme/_HUB"          # linked at the top of the note
-minuta client config "Acme" index  "Clients/Acme/Meetings/Index" # a row (or bullet) is added
+minuta config obsidian_folder "Clientes/{client}/Reuniões"
 ```
 
-These are also in the app, under **Glossary**. The index gets one new row if it has a table
-(matching its columns) or one bullet otherwise, and its `updated:` date is refreshed; a meeting
-already listed is not added twice.
+A pasta é sempre relativa ao vault. Reuniões sem cliente vão para `Clientes/Inbox/Reuniões`
+neste exemplo, ou seja, `{client}` vira `Inbox`.
 
-### Action items to Trello
-
-From the app: **Export → Send action items to Trello…**. The first time it asks you to connect
-(an API key and a token) and to choose the board and list that should receive the cards; then you
-tick the action items to send. Each card gets the action as its title and the owner, the meeting
-(with date) and the time in the recording in its description. Items you already sent are marked and
-never duplicated, even if you send the meeting again.
-
-From the terminal:
+**3. (Opcional) Configure cada cliente.** Para dizer onde as reuniões de um cliente ficam e
+como chegar a elas a partir do resto do vault, use as três opções abaixo. Elas também estão no
+app, no botão **Glossário**, em *No seu vault do Obsidian*:
 
 ```sh
-minuta trello login               # asks for the API key and the token (the token is hidden)
-minuta trello boards              # id <TAB> name
-minuta trello lists <board-id>
-minuta trello use <list-id> "Backlog"
-minuta trello send <name> --dry-run          # show what would be created
-minuta trello send <name> [--only 1,3]       # create the cards (all, or the chosen rows)
+minuta client config "Acme" folder "Clientes/Acme/Reuniões"
+minuta client config "Acme" hub    "Clientes/Acme/_HUB"               # linkado no topo da nota
+minuta client config "Acme" index  "Clientes/Acme/Reuniões/_Índice"   # ganha uma linha por reunião
+```
+
+| Opção | O que faz |
+|---|---|
+| `folder` | Pasta das reuniões desse cliente (vale mais do que `obsidian_folder`). |
+| `hub` | Nota para a qual a reunião aponta, com `Hub: [[…]]` no topo. Só aí o cliente vira um link `[[ ]]`, para não criar notas "fantasma" no grafo. |
+| `index` | Nota que lista as reuniões. Se ela tiver uma tabela, entra uma linha nova com as mesmas colunas; senão, entra um item de lista. O campo `updated:` dela é atualizado, e uma reunião já listada não entra duas vezes. |
+
+Todos os caminhos são relativos ao vault, sem `.md` no final e sem `..`.
+
+**4. Associe o cliente à reunião.** A exportação usa o cliente guardado na reunião. Informe-o ao
+gravar ou importar (`--client "Acme"`, ou o campo *Cliente* em *Nova reunião*). Numa reunião
+antiga, associe-o e reescreva a ata (isso substitui a ata atual):
+
+```sh
+minuta reprocess <nome> --notes-only --client "Acme"
+```
+
+**5. Exporte.** No app, **Exportar → Nota no Obsidian**. No terminal:
+
+```sh
+minuta obsidian <nome>                    # transcrição incluída, em bloco dobrável
+minuta obsidian <nome> --no-transcript    # só a ata
+minuta obsidian <nome> --folder "Inbox"   # pasta só desta vez
+```
+
+O comando imprime o caminho da nota criada (e "added to the index" quando o índice foi
+atualizado).
+
+### Como fica a nota
+
+O arquivo se chama `AAAA-MM-DD - Título.md`. As chaves do frontmatter seguem o idioma da
+interface (aqui, português):
+
+```markdown
+---
+type: reuniao
+created: 2026-11-10
+updated: 2026-11-10
+data: 2026-11-10
+cliente: "Acme"
+participantes: [Maria, Tom]
+duration_min: 47
+tags: [reuniao, minuta, acme]
+fonte: Minuta (transcrição automática; confira antes de agir)
+meeting: 2026-11-10_14-00_alinhamento-semanal
+---
+
+# Alinhamento semanal
+
+Hub: [[Clientes/Acme/_HUB|Acme]]
+
+*47 minutos · 8 falas · participantes: Maria, Tom*
+
+## Resumo
+…
+## Itens de ação
+…
+
+> [!note]- Transcrição
+> [00:05] Maria: Obrigada a todos por entrarem…
+```
+
+Em inglês, as chaves viram `type: meeting`, `date`, `client` e `participants`.
+
+### Boas práticas e solução de problemas
+
+- **Exportar de novo atualiza a mesma nota.** O campo `meeting:` identifica a reunião. Se já
+  existir uma nota *sua* com o mesmo nome, ela nunca é sobrescrita: a nova ganha " (2)".
+- **Confira a ata antes de agir.** O texto vem de transcrição automática e de um modelo
+  pequeno, e a nota avisa isso na propriedade `fonte`.
+- **`no vault set`**: nenhum vault configurado. Rode o passo 1.
+- **`not a folder`**: o caminho do vault não existe ou não é uma pasta.
+- **`is outside the vault`**: a pasta pedida tenta sair do vault (por exemplo, com `..`). Um
+  caminho absoluto é lido como relativo ao vault.
+- **A nota não aparece no grafo ligada a nada**: configure o `hub` e o `index` do cliente
+  (passo 3). Sem isso, a nota existe, mas nada aponta para ela.
+- Se o seu vault usa outras convenções de frontmatter, edite as notas depois: o Minuta
+  só cria e atualiza o arquivo que ele mesmo gerou.
+
+## Itens de ação para o Trello
+
+Pelo app: **Exportar → Enviar itens de ação ao Trello…**. Na primeira vez, ele pede para conectar
+(uma chave de API e um token) e para escolher o quadro e a lista que vão receber os cartões; depois,
+você marca os itens que quer enviar. Cada cartão leva a ação como título e, na descrição, o
+responsável, a reunião (com a data) e a hora na gravação. Os itens já enviados aparecem marcados e
+nunca são duplicados, mesmo que você envie a reunião de novo.
+
+Pelo terminal:
+
+```sh
+minuta trello login               # pede a chave de API e o token (o token fica oculto)
+minuta trello boards              # id <TAB> nome
+minuta trello lists <id-do-quadro>
+minuta trello use <id-da-lista> "Backlog"
+minuta trello send <nome> --dry-run          # mostra o que seria criado
+minuta trello send <nome> [--only 1,3]       # cria os cartões (todos, ou só as linhas escolhidas)
 minuta trello logout
 ```
 
-Create the key and the token yourself on <https://trello.com/power-ups/admin> (*New*, then *API key*;
-the same page offers a *Token*). They are stored in `~/.config/minuta/trello`, readable only by
-you, travel in the body of an HTTPS request (never in a URL) and are never shown in the process list.
-Setting `MINUTA_TRELLO_KEY` and `MINUTA_TRELLO_TOKEN` instead keeps them out of any file.
-Which items were already sent is remembered in `~/.local/share/minuta/rec/<name>.trello`.
+Crie a chave e o token você mesmo em <https://trello.com/power-ups/admin> (*New*, depois *API key*; a
+mesma página oferece o *Token*). Eles ficam em `~/.config/minuta/trello`, legível só por você,
+viajam no corpo de uma requisição HTTPS (nunca numa URL) e não aparecem na lista de processos. Definir
+`MINUTA_TRELLO_KEY` e `MINUTA_TRELLO_TOKEN` mantém os dois fora de qualquer arquivo.
+Os itens já enviados ficam registrados em `~/.local/share/minuta/rec/<nome>.trello`.
 
-## Settings
+**Dica:** para o Trello receber o texto certo, confira a ata antes. Os itens de ação são extraídos
+por regras sobre a transcrição e podem conter falhas de transcrição.
 
-Open **Settings** in the app, or use `minuta config [key [value]]` and
+## Configurações
+
+Abra **Configurações** no app, ou use `minuta config [chave [valor]]` e
 `minuta language`.
 
 <table>
 <tr>
 <td>
 
-| Setting | Values | Default |
+| Configuração | Valores | Padrão |
 |---|---|---|
-| Spoken language | `system` (follows the OS), `auto`, or a code such as `pt`, `en` | `system` |
-| Transcription model | `small`, `medium`, `large-v3-turbo` | `large-v3-turbo` with GPU libraries, else `small` |
-| Processor | `auto` (GPU when usable), `cpu` | `auto` |
-| Who writes the notes | `local`, `claude-code`, `gemini-cli` | `local` |
-| Local summary model | `notes_model`: `small` (0.5B, 0.5 GB) or `medium` (3B, 2 GB) | `small` |
-| Tell voices apart | `diarize` on/off, `speakers` 0 (auto) to 8 | on |
-| Initial prompt | names and jargon to help spelling (`prompt`, up to 500 characters) | empty |
-| Accuracy | `beam` 1 (fast) to 10 | 5 |
-| Obsidian vault / folder | `obsidian_vault` (path), `obsidian_folder` (inside the vault; `{client}` allowed) | unset / `Meetings` |
-| Even out volume / threads | `normalize` on/off, `threads` 0 = auto | off / 0 |
+| Idioma falado | `system` (segue o sistema), `auto`, ou um código como `pt`, `en` | `system` |
+| Modelo de transcrição | `small`, `medium`, `large-v3-turbo` | `large-v3-turbo` com as bibliotecas de GPU, senão `small` |
+| Processador | `auto` (GPU quando der), `cpu` | `auto` |
+| Quem escreve a ata | `local`, `claude-code`, `gemini-cli` | `local` |
+| Modelo local do resumo | `notes_model`: `small` (0,5B, 0,5 GB) ou `medium` (3B, 2 GB) | `small` |
+| Distinguir as vozes | `diarize` ligado/desligado, `speakers` 0 (auto) a 8 | ligado |
+| Prompt inicial | nomes e jargão para ajudar na grafia (`prompt`, até 500 caracteres) | vazio |
+| Precisão | `beam` de 1 (rápido) a 10 | 5 |
+| Vault / pasta do Obsidian | `obsidian_vault` (caminho), `obsidian_folder` (dentro do vault; aceita `{client}`) | vazio / `Meetings` |
+| Nivelar o volume / threads | `normalize` ligado/desligado, `threads` 0 = automático | desligado / 0 |
 
 </td>
-<td width="260"><img src="docs/screenshots/settings.png" alt="Settings dialog"></td>
+<td width="260"><img src="docs/screenshots/settings.png" alt="Janela de configurações"></td>
 </tr>
 </table>
 
-Environment variables override the settings file (`~/.config/minuta/config`):
+As variáveis de ambiente prevalecem sobre o arquivo de configurações
+(`~/.config/minuta/config`):
 
-| Variable | Meaning |
+| Variável | Significado |
 |---|---|
-| `MINUTA_OUT` | where notes are written (default `~/MeetingNotes`) |
-| `MINUTA_HOME` | where models, audio and transcripts live |
-| `MINUTA_WHISPER_MODEL` | transcription model |
-| `MINUTA_LLM_MODEL` | any GGUF chat model for the local note writer |
-| `MINUTA_YOU` / `MINUTA_THEM` | channel labels |
-| `MINUTA_LIVE` | `0` turns off live transcription |
+| `MINUTA_OUT` | onde as atas são gravadas (padrão `~/MeetingNotes`) |
+| `MINUTA_HOME` | onde ficam os modelos, o áudio e as transcrições |
+| `MINUTA_WHISPER_MODEL` | modelo de transcrição |
+| `MINUTA_LLM_MODEL` | qualquer modelo de chat GGUF para o redator local |
+| `MINUTA_YOU` / `MINUTA_THEM` | rótulos dos canais |
+| `MINUTA_LIVE` | `0` desliga a transcrição ao vivo |
 
-## Privacy
+## Privacidade
 
-- Audio, transcripts and notes stay on your machine, in folders only your user can read.
-- Models are downloaded once, during `setup` (or the first use of a new model). After that
-  the transcriber loads them from disk and makes no network calls.
-- **Trello (opt-in, on request):** only when you choose *Send action items to Trello* does the app talk to
-  Trello, and it sends just the text of the items you ticked and the meeting title.
-- **Opt-in exception:** if you pick `claude-code` or `gemini-cli` as the note writer, the
-  **transcript is sent to that service** to write the notes. The app uses the CLI you
-  already have installed and logged in, and never sees your credentials. Notes written
-  this way say so at the top, and the app marks them with a cloud badge. Leave the setting
-  on `local` to keep everything offline.
+- O áudio, as transcrições e as atas ficam na sua máquina, em pastas que só o seu usuário lê.
+- Os modelos são baixados uma vez, durante o `setup` (ou no primeiro uso de um modelo novo).
+  Depois disso, o transcritor os carrega do disco e não faz chamadas de rede.
+- **Exceção opcional:** se você escolher `claude-code` ou `gemini-cli` para escrever a ata, a
+  **transcrição é enviada a esse serviço** para a ata ser escrita. O app usa a CLI que você já
+  tem instalada e autenticada e nunca vê as suas credenciais. As atas escritas assim avisam no
+  topo, e o app as marca com um selo de nuvem. Deixe a configuração em `local` para manter
+  tudo offline.
+- **Trello (opcional, sob demanda):** só quando você escolhe *Enviar itens de ação ao Trello* o app fala com o
+  Trello, e ele envia apenas o texto dos itens marcados e o título da reunião.
+- **Obsidian:** a exportação só escreve arquivos dentro da pasta do vault que você escolheu.
 
-> **Recording consent.** Recording a conversation without telling the other participants is
-> illegal in many places. `minuta start` prints a reminder; please honour it.
+> **Consentimento para gravar.** Gravar uma conversa sem avisar os outros participantes é
+> ilegal em muitos lugares. O `minuta start` imprime um lembrete; respeite-o.
 
-## Development
+## Desenvolvimento
 
 ```sh
 python3 -m unittest discover -s tests
 ```
 
-Covers note classification, focus matching, search, Obsidian export, Trello (against a local fake server), the external writer, input levels, the CLI
-(glossaries, interrupted recordings, renames) and word error rate. To guard transcription
-quality when you change the pipeline, point the end-to-end test at a recording and its
-reference text:
+Cobre a classificação das falas, o foco, a busca, a exportação para o Obsidian, o Trello (contra um servidor falso local), o redator
+externo, os níveis de áudio, a CLI (glossários, gravações interrompidas, renomeações) e a taxa
+de erro de palavras. Para proteger a qualidade da transcrição ao mexer no pipeline, aponte o
+teste de ponta a ponta para uma gravação e o texto de referência dela:
 
 ```sh
-MI_E2E_AUDIO=talk.wav MI_E2E_REFERENCE=talk.txt MI_E2E_MAX_WER=0.20 \
+MI_E2E_AUDIO=fala.wav MI_E2E_REFERENCE=fala.txt MI_E2E_MAX_WER=0.20 \
   ~/.local/share/minuta/venv/bin/python -m unittest tests.test_e2e
 ```
 
-The screenshots in this README are generated from made-up demo data (nothing from real
-meetings): `GDK_BACKEND=x11 python3 packaging/screenshots.py`.
+As capturas de tela deste README são geradas a partir de dados fictícios (nada de reuniões
+reais): `GDK_BACKEND=x11 python3 packaging/screenshots.py`.
 
-## Licence
+## Licença
 
-MIT — see [`LICENSE`](LICENSE).
+MIT. Veja o [`LICENSE`](LICENSE).
 
 ## Links
 
-- Source: https://github.com/bcocheto/minuta
-- Minuta started as a fork of [techbysaurabh/meetinginsights-linux](https://github.com/techbysaurabh/meetinginsights-linux)
-  (MIT) and keeps that licence notice. The name, the icon and most of the code since are new.
-- Formerly *MeetingInsights*: settings and data are moved over automatically the first time `minuta` runs.
+- Código-fonte: https://github.com/bcocheto/minuta
+- A Minuta nasceu de um fork de [techbysaurabh/meetinginsights-linux](https://github.com/techbysaurabh/meetinginsights-linux)
+  (MIT) e mantém o aviso dessa licença. O nome, o ícone e a maior parte do código desde então são novos.
+- Antes se chamava *MeetingInsights*: as configurações e os dados são movidos automaticamente na primeira vez que o `minuta` roda.
