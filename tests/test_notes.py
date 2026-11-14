@@ -79,6 +79,25 @@ class External(unittest.TestCase):
         self.assertIn("foco", run.call_args[0][0][run.call_args[0][0].index("--system-prompt") + 1])
 
 
+class LocalModelOutput(unittest.TestCase):
+    def _run(self, stdout: bytes) -> str:
+        fake = mock.Mock(returncode=0, stdout=stdout, stderr=b"")
+        with mock.patch.object(nl.subprocess, "run", return_value=fake) as run:
+            out = nl.run_model("m.gguf", "sys", "user", 10)
+        self.assertNotIn("text", run.call_args.kwargs)               # bytes, decoded by us
+        return out
+
+    def test_truncated_utf8_does_not_raise(self):
+        full = "> pergunta\nreunião de ação\n[ Prompt: 1 t/s ]\n".encode()
+        cut = "> pergunta\nreunião de a".encode()[:-1] + b"\xc3"      # ends mid multi-byte char
+        self.assertEqual(self._run(full), "reunião de ação")
+        self.assertTrue(self._run(cut).startswith("reunião de "))
+
+    def test_invalid_bytes_in_middle_are_replaced(self):
+        out = self._run(b"> p\nabc\xff\xfedef\n[ Prompt: 1 ]\n")
+        self.assertTrue(out.startswith("abc") and out.endswith("def"))
+
+
 class Wer(unittest.TestCase):
     def test_wer(self):
         self.assertEqual(wer("a b c d", "a b c d"), 0.0)

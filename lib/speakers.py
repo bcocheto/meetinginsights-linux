@@ -12,7 +12,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-LINE = re.compile(r"^(\[\d{1,2}:\d{2}(?::\d{2})?\]\s+)([^:\n]+?)(:\s*.*)$")
+LINE = re.compile(r"^(\[\d{1,3}:\d{2}(?::\d{2})?\]\s+)([^:\n]+?)(:\s*.*)$")
 
 
 def list_speakers(text: str) -> list[tuple[str, int]]:

@@ -62,6 +62,20 @@ Keep a glossary of names and terms for a client.
 .BI "reprocess " name
 Transcribe again and rewrite the minutes (\fB--notes-only\fR to skip transcription).
 .TP
+.B parts
+List recordings and show whether each has minutes, a transcript without minutes,
+audio without a transcript, or is being processed.
+.TP
+.BI "merge --title " title " part1 part2 part..."
+Join two or more recordings of one meeting into a new meeting. Parts are listed
+in the order they happened; their original audio and transcripts are left untouched.
+Speaker names are kept separate by part. Use \fBspeakers\fR on the new meeting to
+identify names that refer to the same person. If a part's audio length is unavailable,
+the next part's start time is estimated from its transcript and marked approximate.
+Use \fB--no-notes\fR to create only the joined transcript, or \fB--dry-run\fR to
+review the combined timeline without creating files. The desktop app offers the same
+operation through its “Join parts…” button.
+.TP
 .BI "rename " name " title"
 Rename a meeting.
 .TP

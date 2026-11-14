@@ -21,6 +21,10 @@
 #   minuta toggle [title]                     start, or stop and write the notes (for a keyboard shortcut)
 #   minuta shortcut [show|set <keys>|remove]  keyboard shortcut for toggle, e.g. '<Super><Alt>r' (GNOME)
 #   minuta speakers <name> ["Old=New" ...]     list the speakers, or rename them in the transcript and the notes
+#   minuta parts                              list every recording and what it still needs (notes, transcript, audio)
+#   minuta merge --title T <part1> <part2> ... [--client N] [--focus T] [--no-notes] [--dry-run]
+#                                             join recordings that are parts of one meeting into a NEW meeting
+#                                             (the parts stay untouched; list them in the order they happened)
 #   minuta export <name> <md|docx|pdf> [file] [--no-transcript]   export notes + transcript
 #   minuta delete <name>                      delete a meeting's notes, transcript and audio
 #
@@ -285,9 +289,9 @@ PYEOF
 CLIENTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/minuta/clients"
 _slug() { echo "$1" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//'; }
 
-M_CLIENT=""; M_FOCUS=""; M_CLIENT_SET=0; M_FOCUS_SET=0; POS=()
+M_CLIENT=""; M_FOCUS=""; M_TITLE=""; M_MINS=""; M_CLIENT_SET=0; M_FOCUS_SET=0; POS=()
 _parse_meta_flags() { # splits --client/--focus from the other arguments (left in POS)
-    POS=(); M_CLIENT=""; M_FOCUS=""; M_CLIENT_SET=0; M_FOCUS_SET=0
+    POS=(); M_CLIENT=""; M_FOCUS=""; M_TITLE=""; M_MINS=""; M_CLIENT_SET=0; M_FOCUS_SET=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --client) [[ $# -ge 2 ]] || die "--client needs a name"; M_CLIENT="$2"; M_CLIENT_SET=1; shift 2 ;;
@@ -295,22 +299,26 @@ _parse_meta_flags() { # splits --client/--focus from the other arguments (left i
             *) POS+=("$1"); shift ;;
         esac
     done
-    M_CLIENT="$(echo "$M_CLIENT" | tr '\n\r' '  ')"; M_CLIENT="${M_CLIENT:0:80}"
-    M_FOCUS="$(echo "$M_FOCUS" | tr '\n\r' '  ')";   M_FOCUS="${M_FOCUS:0:500}"
+    M_CLIENT="${M_CLIENT//[$'\n\r']/ }"; M_CLIENT="${M_CLIENT:0:80}"
+    M_FOCUS="${M_FOCUS//[$'\n\r']/ }";   M_FOCUS="${M_FOCUS:0:500}"
 }
-_meta_load() { # _meta_load <base> : reads <base>.meta into M_CLIENT / M_FOCUS
-    M_CLIENT=""; M_FOCUS=""
+_meta_load() { # _meta_load <base> : reads <base>.meta into M_CLIENT / M_FOCUS / M_TITLE / M_MINS
+    M_CLIENT=""; M_FOCUS=""; M_TITLE=""; M_MINS=""
     [[ -f "$1.meta" ]] || return 0
     M_CLIENT=$(sed -n 's/^client=//p' "$1.meta" | head -n1)
     M_FOCUS=$(sed -n 's/^focus=//p' "$1.meta" | head -n1)
+    M_TITLE=$(sed -n 's/^title=//p' "$1.meta" | head -n1)
+    M_MINS=$(sed -n 's/^minutes=//p' "$1.meta" | head -n1)
 }
-_meta_save() { # _meta_save <base>
-    if [[ -n "$M_CLIENT$M_FOCUS" ]]; then
-        { [[ -z "$M_CLIENT" ]] || echo "client=$M_CLIENT"; [[ -z "$M_FOCUS" ]] || echo "focus=$M_FOCUS"; } > "$1.meta"
+_meta_save() { # _meta_save <base>   (title and minutes only exist for joined meetings: they have no notes or audio to read them from)
+    if [[ -n "$M_CLIENT$M_FOCUS$M_TITLE$M_MINS" ]]; then
+        { [[ -z "$M_CLIENT" ]] || echo "client=$M_CLIENT"; [[ -z "$M_FOCUS" ]] || echo "focus=$M_FOCUS"
+          [[ -z "$M_TITLE" ]] || echo "title=$M_TITLE"; [[ -z "$M_MINS" ]] || echo "minutes=$M_MINS"; } > "$1.meta"
     else
         rm -f "$1.meta"
     fi
 }
+_is_recording() { [[ -f "$STATE" ]] && [[ "$(head -n1 "$STATE")" == "$DATA_DIR/rec/$1" ]]; }
 _meta_env() { # exports the focus/glossary and adds the glossary to the speech prompt
     local gloss="" f
     if [[ -n "$M_CLIENT" ]]; then
@@ -553,7 +561,20 @@ cmd_stop() { # stop [--capture-only]
 }
 
 # Everything after the capture: wait for the live transcript, tell voices apart, write the notes.
-_finish_recording() { # _finish_recording <name>
+# One job at a time per recording. The lock belongs to the process doing the work and the system
+# drops it when that process ends, so a crashed or abandoned job never blocks a later recovery.
+_with_lock() { # _with_lock <name> <command...>
+    local n="$1"; shift
+    [[ -n "$n" && "$n" != */* && "$n" != *..* ]] || die "invalid name: ${n:-<empty>}"
+    mkdir -p "$DATA_DIR/rec"
+    (
+        exec 8>>"$DATA_DIR/rec/$n.lock" || exit 1
+        flock -n 8 || { echo "minuta: $n is already being processed by another job; wait for it to finish" >&2; exit 1; }
+        "$@"
+    )
+}
+_finish_recording() { _with_lock "$1" _finish_body "$1"; } # _finish_recording <name>
+_finish_body() {
     local base="$DATA_DIR/rec/$1" title mins live_pid used_live=0
     [[ -f "$base.job" ]] || die "nothing to finish for: $1"
     { read -r title; read -r mins; read -r live_pid; } < "$base.job"
@@ -702,13 +723,25 @@ _meeting_title() {
 
 cmd_reprocess() {
     _parse_meta_flags "$@"
+    local n="${POS[0]:-}"
+    _valid_name "$n"
+    _with_lock "$n" _reprocess_body "$@"
+}
+_reprocess_body() {
+    _parse_meta_flags "$@"
     local name="${POS[0]:-}" mode="${POS[1]:-}" nc="$M_CLIENT" nf="$M_FOCUS" sc="$M_CLIENT_SET" sf="$M_FOCUS_SET"
     _valid_name "$name"
     local base="$DATA_DIR/rec/$name" title mins d
+    _is_recording "$name" && die "this meeting is being recorded right now"
     _meta_load "$base"
     (( sc )) && M_CLIENT="$nc"; (( sf )) && M_FOCUS="$nf"
     _meta_save "$base"; _meta_env
     title=$(_meeting_title "$name")
+    if [[ ! -f "$OUT_DIR/$name.md" ]]; then   # no notes yet: keep the title that was typed, not one rebuilt from the file name
+        if [[ -n "$M_TITLE" ]]; then title="$M_TITLE"
+        elif [[ -s "$base.job" ]]; then title="$(head -n1 "$base.job")"
+        else title=$(echo "${name#*_*_}" | tr '-' ' '); fi
+    fi
     if [[ "$mode" != "--notes-only" ]]; then
         [[ -s "$base.wav" ]] || die "the audio for this meeting was not kept: $base.wav"
         echo "Transcribing again (model: $WHISPER_MODEL, language: $MINUTA_LANGUAGE)..."
@@ -718,22 +751,50 @@ cmd_reprocess() {
         mv -f "$base.txt.new" "$base.txt"
         _voice_prefixes; _split_voices "$base.wav" "$base.txt" "$THEM_LABEL" "$_p_part"
     fi
-    d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
-    mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
+    if [[ -s "$base.wav" ]]; then
+        d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$base.wav" 2>/dev/null)
+        mins=$(awk -v d="${d:-0}" 'BEGIN{printf "%d", d/60}')
+    else   # no audio (a joined meeting): the length that was recorded, else the end of the transcript
+        mins=""
+        [[ "$M_MINS" =~ ^[0-9]+$ ]] && mins="$M_MINS"
+        [[ -z "$mins" && -s "$base.job" ]] && mins="$(sed -n 2p "$base.job" | grep -E '^[0-9]+$' || true)"
+        [[ -n "$mins" ]] || mins=$(grep -oE '^\[[0-9]+:' "$base.txt" | tail -n1 | tr -dc '0-9')
+        mins="${mins:-0}"
+    fi
     cmd_notes "$base.txt" "$title" "$mins"
 }
 
 cmd_rename() {
+    local name="${1:-}"
+    _valid_name "$name"
+    _with_lock "$name" _rename_body "$@"
+}
+_rename_body() {
     local name="${1:-}" new="${2:-}"
     _valid_name "$name"
+    _is_recording "$name" && die "this meeting is being recorded right now"
     [[ -n "$new" ]] || die "usage: minuta rename <name> <new title>"
     local slug prefix newname
     slug=$(echo "$new" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
     slug="${slug:-meeting}"
     prefix=$(echo "$name" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}_' || true)
     newname="${prefix}${slug}"
-    if [[ "$newname" != "$name" && ( -e "$OUT_DIR/$newname.md" || -e "$DATA_DIR/rec/$newname.wav" ) ]]; then
+    if [[ "$newname" != "$name" && ( -e "$OUT_DIR/$newname.md" || \
+          -e "$DATA_DIR/rec/$newname.txt" || -e "$DATA_DIR/rec/$newname.wav" || \
+          -e "$DATA_DIR/rec/$newname.meta" || -e "$DATA_DIR/rec/$newname.nospeech" ) ]]; then
         die "a meeting named $newname already exists"
+    fi
+    if [[ "$newname" != "$name" ]]; then
+        _with_lock "$newname" _rename_apply "$name" "$new" "$newname"
+    else
+        _rename_apply "$name" "$new" "$newname"
+    fi
+}
+_rename_apply() {
+    local name="$1" new="$2" newname="$3"
+    _meta_load "$DATA_DIR/rec/$name"
+    if [[ -n "$M_TITLE" || ! -f "$OUT_DIR/$name.md" ]]; then   # joined or not-yet-noted meetings keep their title in .meta
+        M_TITLE="${new//[$'\n\r']/ }"; M_TITLE="${M_TITLE:0:120}"; _meta_save "$DATA_DIR/rec/$name"
     fi
     if [[ -f "$OUT_DIR/$name.md" ]]; then
         # replace the heading only on the first line
@@ -796,13 +857,82 @@ cmd_shortcut() {
 }
 
 cmd_speakers() {
-    local name="${1:-}"; shift || true
+    local name="${1:-}"
     _valid_name "$name"
+    _with_lock "$name" _speakers_body "$@"
+}
+_speakers_body() {
+    local name="${1:-}"; shift || true
+    _is_recording "$name" && die "this meeting is being recorded right now"
     local base="$DATA_DIR/rec/$name"
     [[ -s "$base.txt" ]] || die "no transcript for $name"
     if (( $# == 0 )); then python3 -I "$PREFIX/lib/speakers.py" list "$base.txt"; return; fi
     local notes="-"; [[ -f "$OUT_DIR/$name.md" ]] && notes="$OUT_DIR/$name.md"
     python3 -I "$PREFIX/lib/speakers.py" rename "$base.txt" "$notes" "$@"
+}
+
+cmd_parts() { # parts: name<TAB>state, newest first (notes | transcript | audio | busy)
+    "$(command -v python3)" -I "$PREFIX/lib/merge.py" list "$OUT_DIR" "$DATA_DIR/rec"
+}
+
+# Join recordings that are parts of one meeting into a NEW meeting. The parts are only read.
+cmd_merge() {
+    local title="" no_notes=0 dry=0 parts=() rest=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --title)    [[ $# -ge 2 ]] || die "--title needs a text"; title="$2"; shift 2 ;;
+            --no-notes) no_notes=1; shift ;;
+            --dry-run)  dry=1; shift ;;
+            *)          rest+=("$1"); shift ;;
+        esac
+    done
+    _parse_meta_flags ${rest[@]+"${rest[@]}"}; parts=(${POS[@]+"${POS[@]}"})
+    title="${title//[$'\n\r']/ }"; title="${title:0:120}"; title="${title#"${title%%[![:space:]]*}"}"
+    (( ${#parts[@]} >= 2 )) || die "usage: minuta merge --title <title> <part1> <part2> [...]   (see: minuta parts)"
+    [[ -n "$title" ]] || die "give the joined meeting a title: --title <title>"
+
+    local n i j args=() d
+    for i in "${!parts[@]}"; do
+        n="${parts[$i]}"
+        _valid_name "$n"
+        for (( j = 0; j < i; j++ )); do [[ "${parts[$j]}" != "$n" ]] || die "listed twice: $n"; done
+        d=""
+        [[ -s "$DATA_DIR/rec/$n.wav" ]] && d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$DATA_DIR/rec/$n.wav" 2>/dev/null)
+        args+=("$n" "$DATA_DIR/rec/$n.txt" "$d")
+    done
+
+    (( no_notes || dry )) || check_ready   # fail before writing anything if the notes cannot be made
+    local lang=en; case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in pt*) lang=pt ;; esac
+    local slug prefix name k=1
+    slug=$(_slug "$title"); slug="${slug:-meeting}"
+    prefix=$(echo "${parts[0]}" | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}_' || date +%Y-%m-%d_%H-%M_)
+    name="$prefix$slug"
+    while [[ -e "$OUT_DIR/$name.md" || -e "$DATA_DIR/rec/$name.txt" || -e "$DATA_DIR/rec/$name.wav" \
+             || -e "$DATA_DIR/rec/$name.txt.new" || -e "$DATA_DIR/rec/$name.partial.txt" \
+             || -e "$DATA_DIR/rec/$name.mic.wav" || -e "$DATA_DIR/rec/$name.sys.wav" \
+             || -e "$DATA_DIR/rec/$name.meta" || -e "$DATA_DIR/rec/$name.job" \
+             || -e "$DATA_DIR/rec/$name.nospeech" || -e "$DATA_DIR/rec/$name.lock" ]]; do
+        k=$((k + 1)); (( k < 100 )) || die "could not find a free name for: $title"
+        name="$prefix$slug-$k"
+    done
+    mkdir -p "$DATA_DIR/rec" "$OUT_DIR"
+    chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
+    local base="$DATA_DIR/rec/$name" plan rc
+    if (( dry )); then
+        "$(command -v python3)" -I "$PREFIX/lib/merge.py" --dry-run "$base.txt" "$lang" "${args[@]}" || return 1
+        echo "Would create: $name"; return 0
+    fi
+    plan=$("$(command -v python3)" -I "$PREFIX/lib/merge.py" "$base.txt" "$lang" "${args[@]}"); rc=$?
+    (( rc == 0 )) || die "the parts were not joined and nothing was written"
+    M_TITLE="$title"; M_MINS=$(( $(sed -n 's/^TOTAL\t//p' <<<"$plan") / 60 ))
+    _meta_save "$base"      # the typed title and the length: a joined meeting has no notes or audio to read them from
+    echo "Joined ${#parts[@]} parts into: $name"
+    echo "Originals untouched. Speaker labels carry their part; to say two are the same person, use: minuta speakers $name 'Old=New'"
+    (( no_notes )) && { echo "Transcript: $base.txt"; return 0; }
+    _meta_env
+    if cmd_notes "$base.txt" "$title" "$M_MINS"; then return 0; fi
+    echo "The joined transcript is saved; write the notes later with: minuta reprocess $name --notes-only" >&2
+    return 1
 }
 
 cmd_import() {
@@ -811,10 +941,21 @@ cmd_import() {
     [[ -f "$file" ]] || die "usage: minuta import <audio-or-video-file> [title]"
     need ffmpeg; check_ready
     [[ -n "$title" ]] || title="$(basename "${file%.*}")"
-    local slug ts base
+    local slug ts base k=1
     slug=$(echo "$title" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
     ts=$(date +%Y-%m-%d_%H-%M)
     base="$DATA_DIR/rec/${ts}_${slug:-meeting}"
+    while [[ -e "$base.wav" || -e "$base.txt" || -e "$base.txt.new" || -e "$base.partial.txt" || \
+             -e "$base.mic.wav" || -e "$base.sys.wav" || -e "$base.meta" || -e "$base.job" || \
+             -e "$base.nospeech" || -e "$base.lock" || -e "$OUT_DIR/$(basename "$base").md" ]]; do
+        k=$((k + 1)); (( k < 100 )) || die "could not find a free name for: $title"
+        base="$DATA_DIR/rec/${ts}_${slug:-meeting}-$k"
+    done
+    _with_lock "$(basename "$base")" _import_body "$file" "$title" "$base"
+}
+
+_import_body() {
+    local file="$1" title="$2" base="$3"
     mkdir -p "$DATA_DIR/rec" "$OUT_DIR"
     chmod 700 "$DATA_DIR" "$DATA_DIR/rec" "$OUT_DIR" 2>/dev/null || true
     _meta_save "$base"; _meta_env
@@ -915,9 +1056,15 @@ cmd_trello() { # trello login|logout|status|boards|lists <board>|use <list-id> [
 cmd_delete() {
     local name="${1:-}"
     _valid_name "$name"
-    if [[ -f "$STATE" ]] && [[ "$(head -n1 "$STATE")" == "$DATA_DIR/rec/$name" ]]; then
+    _with_lock "$name" _delete_body "$name"
+}
+_delete_body() {
+    local name="${1:-}"
+    if _is_recording "$name"; then
         die "this meeting is being recorded right now"
     fi
+    # Keep the lock inode: unlinking a locked file lets a new process create and lock a
+    # different inode at the same path while this operation still owns the old one.
     rm -f -- "$OUT_DIR/$name.md" "$DATA_DIR/rec/$name.txt" "$DATA_DIR/rec/$name.wav" "$DATA_DIR/rec/$name.meta" "$DATA_DIR/rec/$name.nospeech"
     echo "Deleted: $name"
 }
@@ -931,6 +1078,8 @@ case "${1:-}" in
     reprocess) shift; cmd_reprocess "$@" ;;
     rename) shift; cmd_rename "$@" ;;
     speakers) shift; cmd_speakers "$@" ;;
+    parts)  cmd_parts ;;
+    merge)  shift; cmd_merge "$@" ;;
     toggle) shift; cmd_toggle "$@" ;;
     shortcut) shift; cmd_shortcut "$@" ;;
     _notify_done) _notify "Notes ready" "$(echo "${2:-}" | sed -E 's/^[0-9-]+_[0-9-]+_//')" ;;
@@ -948,6 +1097,6 @@ case "${1:-}" in
     config) shift; cmd_config "$@" ;;
     language) shift; cmd_language "$@" ;;
     notes)  shift; [[ $# -ge 1 ]] || die "usage: minuta notes <transcript.txt>"; cmd_notes "$@" ;;
-    -h|--help|help|"") sed -n "3,30p" "$0" | sed 's/^# \?//' ;;
+    -h|--help|help|"") sed -n "3,34p" "$0" | sed 's/^# \?//' ;;
     *) die "unknown command: $1 (try: minuta help)" ;;
 esac

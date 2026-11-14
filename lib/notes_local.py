@@ -18,6 +18,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import merge as _merge  # noqa: E402  (part-boundary lines of joined meetings)
+
 LLAMA_DIR = Path(os.environ.get(
     "MINUTA_LLAMA_DIR", Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "minuta/llama"))
 LLAMA_BIN = LLAMA_DIR / "llama"
@@ -39,6 +42,7 @@ _PT = {
     "Open Questions": "Perguntas em aberto", "Owner": "Responsável", "Action": "Ação",
     "Time": "Hora", "said": "disse", "minutes": "minutos", "turns": "falas", "participants": "participantes",
     "Could not summarize.": "Não foi possível resumir.",
+    "Parts": "Partes", "Part": "Parte", "starts at": "começa em", "approximate": "aproximado",
     "Focus": "Foco", "Client": "Cliente", "In focus": "Em foco",
     "None of the focus points were mentioned.": "Nenhum ponto do foco foi mencionado.",
     "None identified.": "Nenhum identificado.", "None recorded.": "Nenhuma registrada.",
@@ -69,12 +73,14 @@ def run_model(model: str, system: str, user: str, n_predict: int, grammar: str |
     env = {"LD_LIBRARY_PATH": str(LLAMA_DIR), "PATH": "/usr/bin:/bin",
            "HOME": str(Path.home()), "TERM": "dumb"}
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
+        r = subprocess.run(cmd, capture_output=True, timeout=300, env=env)
     except subprocess.TimeoutExpired:
         return ""
 
     # the reply sits between the echoed prompt line ("> ...") and the stats line
-    lines, reply, seen = r.stdout.splitlines(), [], False
+    # decode here: a truncated multi-byte sequence must not abort the whole run
+    stdout = (r.stdout or b"").decode("utf-8", errors="replace")
+    lines, reply, seen = stdout.splitlines(), [], False
     for line in lines:
         if not seen:
             if line.startswith("> "):
@@ -93,7 +99,7 @@ def chat(model: str, system: str, user: str, n_predict: int, grammar=None) -> st
 def parse_turns(text: str):
     turns = []
     for line in text.splitlines():
-        m = re.match(r"\[(\d{2}:\d{2})\]\s+([^:]+):\s*(.*)", line.strip())
+        m = re.match(r"\[(\d{1,3}:\d{2}(?::\d{2})?)\]\s+([^:]+):\s*(.*)", line.strip())
         if m:
             turns.append({"t": m.group(1), "speaker": m.group(2).strip(), "text": m.group(3).strip()})
     return turns
@@ -222,6 +228,17 @@ def summarize_chunk(model, turns, focus: str = "", language: str = "") -> str:
     return s if len(s) > 15 else ""
 
 
+def parts_section(text: str) -> list[str]:
+    """Where each recording of a joined meeting starts: metadata about the meeting, not speech."""
+    joined = _merge.headers(text)
+    if not joined:
+        return []
+    L = [f"## {T('Parts')}\n"]
+    for i, name, start, approx in joined:
+        L.append(f"- {T('Part')} {i}: {name} ({T('starts at')} {start}{', ' + T('approximate') if approx else ''})")
+    return L + [""]
+
+
 def main() -> int:
     transcript, out_path, model = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
     title = sys.argv[4] if len(sys.argv) > 4 else "Meeting"
@@ -286,6 +303,8 @@ def main() -> int:
         L.append("> " + T("Notes written offline by a small local model. Structure and speaker "
                  "attribution are derived from the transcript itself; only the prose "
                  "summaries are model-generated.") + "\n")
+
+    L.extend(parts_section(transcript.read_text()))
 
     L.append(f"## {T('Summary')}\n")
     L.extend(f"- {s}" for _, s in summaries) if summaries else L.append(f"_{T('Could not summarize.')}_")
